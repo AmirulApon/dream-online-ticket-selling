@@ -1,0 +1,258 @@
+/* Admin Styles */
+.dots-dashboard {
+    margin-top: 20px;
+}
+
+.dots-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.dots-stat-card {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.dots-stat-icon {
+    font-size: 40px;
+    color: #2271b1;
+}
+
+.dots-stat-content h3 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 600;
+}
+
+.dots-stat-content p {
+    margin: 5px 0 0;
+    color: #646970;
+}
+
+.dots-dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.dots-dashboard-widget {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.dots-dashboard-widget h2 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.dots-quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.dots-status {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.dots-status-published,
+.dots-status-completed {
+    background: #00a32a;
+    color: #fff;
+}
+
+.dots-status-draft,
+.dots-status-pending {
+    background: #dba617;
+    color: #fff;
+}
+
+.dots-status-cancelled {
+    background: #d63638;
+    color: #fff;
+}
+
+/* Event Edit Form */
+.dots-event-edit {
+    max-width: 1200px;
+}
+
+.dots-form-section {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.dots-form-section h2 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.dots-category-item {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 10px;
+    background: #f6f7f7;
+    border-radius: 4px;
+    align-items: center;
+}
+
+.dots-category-item input {
+    padding: 6px 8px;
+}
+
+/* Forms Management */
+.dots-forms-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+}
+
+.dots-sortable-fields {
+    min-height: 200px;
+}
+
+.dots-field-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    cursor: move;
+}
+
+.dots-field-item:hover {
+    border-color: #2271b1;
+}
+
+.dots-field-info {
+    flex: 1;
+}
+
+.dots-field-type {
+    display: inline-block;
+    padding: 2px 6px;
+    background: #f0f0f1;
+    border-radius: 3px;
+    font-size: 11px;
+    margin-left: 10px;
+}
+
+.dots-field-required {
+    display: inline-block;
+    padding: 2px 6px;
+    background: #d63638;
+    color: #fff;
+    border-radius: 3px;
+    font-size: 11px;
+    margin-left: 10px;
+}
+
+.dots-field-actions {
+    display: flex;
+    gap: 5px;
+}
+
+/* Modal */
+.dots-modal {
+    display: none;
+    position: fixed;
+    z-index: 100000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.dots-modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 600px;
+    border-radius: 4px;
+}
+
+.dots-modal-close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.dots-modal-close:hover {
+    color: #000;
+}
+
+/* Settings Tabs */
+.dots-settings .nav-tab-wrapper {
+    margin-bottom: 20px;
+}
+
+.dots-tab-content {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+}
+
+/* Sales Stats */
+.dots-sales-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.dots-sales-stats .dots-stat-card {
+    text-align: center;
+    flex-direction: column;
+}
+
+.dots-sales-stats .dots-stat-card h3 {
+    font-size: 32px;
+    margin: 10px 0;
+}
+
+/* Responsive */
+@media (max-width: 782px) {
+    .dots-dashboard-grid,
+    .dots-forms-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .dots-category-item {
+        grid-template-columns: 1fr;
+    }
+}
+

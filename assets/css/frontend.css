@@ -1,0 +1,421 @@
+/* Frontend Styles */
+.dots-events-list-frontend {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.dots-events-header {
+    margin-bottom: 30px;
+}
+
+.dots-events-header h2 {
+    font-size: 32px;
+    margin-bottom: 10px;
+}
+
+.dots-events-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 30px;
+}
+
+.dots-event-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.dots-event-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.dots-event-image {
+    width: 100%;
+    height: 200px;
+    overflow: hidden;
+    background: #f0f0f0;
+}
+
+.dots-event-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.dots-event-content {
+    padding: 20px;
+}
+
+.dots-event-content h3 {
+    margin: 0 0 15px;
+    font-size: 24px;
+}
+
+.dots-event-content h3 a {
+    text-decoration: none;
+    color: #333;
+}
+
+.dots-event-content h3 a:hover {
+    color: #2271b1;
+}
+
+.dots-event-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 15px;
+    font-size: 14px;
+    color: #666;
+}
+
+.dots-event-meta span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dots-event-meta .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.dots-event-description {
+    margin-bottom: 15px;
+    color: #555;
+    line-height: 1.6;
+}
+
+.dots-event-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.dots-event-price {
+    font-size: 20px;
+    font-weight: 600;
+    color: #2271b1;
+}
+
+.dots-event-button {
+    display: inline-block;
+    padding: 10px 20px;
+    background: #2271b1;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background 0.3s;
+}
+
+.dots-event-button:hover {
+    background: #135e96;
+    color: #fff;
+}
+
+/* Single Event Page */
+.dots-single-event {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.dots-event-banner {
+    width: 100%;
+    height: 400px;
+    overflow: hidden;
+    background: #f0f0f0;
+}
+
+.dots-event-banner img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.dots-event-container {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 30px;
+    padding: 30px 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.dots-event-main h1 {
+    font-size: 36px;
+    margin-bottom: 20px;
+}
+
+.dots-event-info {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 8px;
+}
+
+.dots-info-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.dots-info-item .dashicons {
+    color: #2271b1;
+}
+
+.dots-event-description {
+    line-height: 1.8;
+    color: #555;
+}
+
+/* Ticket Form */
+.dots-ticket-form-wrapper {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 25px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 20px;
+}
+
+.dots-ticket-form-wrapper h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 24px;
+}
+
+.dots-ticket-form .dots-form-group {
+    margin-bottom: 20px;
+}
+
+.dots-ticket-form label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+}
+
+.dots-ticket-form .required {
+    color: #d63638;
+}
+
+.dots-ticket-form input[type="text"],
+.dots-ticket-form input[type="email"],
+.dots-ticket-form input[type="tel"],
+.dots-ticket-form input[type="number"],
+.dots-ticket-form input[type="date"],
+.dots-ticket-form select,
+.dots-ticket-form textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.dots-ticket-form input:focus,
+.dots-ticket-form select:focus,
+.dots-ticket-form textarea:focus {
+    outline: none;
+    border-color: #2271b1;
+    box-shadow: 0 0 0 2px rgba(34, 113, 177, 0.1);
+}
+
+.dots-quantity-info {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px;
+    color: #666;
+}
+
+.dots-price-summary {
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 4px;
+    margin: 20px 0;
+}
+
+.dots-price-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.dots-price-row.dots-total {
+    border-top: 2px solid #ddd;
+    padding-top: 10px;
+    margin-top: 10px;
+    font-size: 18px;
+}
+
+.dots-submit-button {
+    width: 100%;
+    padding: 15px;
+    background: #2271b1;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.dots-submit-button:hover {
+    background: #135e96;
+}
+
+.dots-submit-button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.dots-form-message {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.dots-form-message.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.dots-form-message.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Order Confirmation */
+.dots-order-confirmation {
+    min-height: 100vh;
+    background: #f5f5f5;
+    padding: 40px 20px;
+}
+
+.dots-confirmation-container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 8px;
+    padding: 40px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.dots-confirmation-header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding-bottom: 30px;
+    border-bottom: 2px solid #eee;
+}
+
+.dots-confirmation-header .dashicons {
+    font-size: 64px;
+    color: #00a32a;
+    margin-bottom: 20px;
+}
+
+.dots-confirmation-header h1 {
+    margin: 0 0 10px;
+    font-size: 32px;
+    color: #333;
+}
+
+.dots-order-details h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 24px;
+}
+
+.dots-order-info {
+    margin-bottom: 30px;
+}
+
+.dots-info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.dots-info-row:last-child {
+    border-bottom: none;
+}
+
+.dots-qr-code {
+    text-align: center;
+    margin: 30px 0;
+    padding: 30px;
+    background: #f9f9f9;
+    border-radius: 8px;
+}
+
+.dots-qr-code img {
+    max-width: 200px;
+    margin: 20px 0;
+}
+
+.dots-customer-info {
+    margin: 30px 0;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 8px;
+}
+
+.dots-customer-info h3 {
+    margin-top: 0;
+}
+
+.dots-confirmation-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.dots-button {
+    flex: 1;
+    padding: 12px 24px;
+    background: #2271b1;
+    color: #fff;
+    text-decoration: none;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.dots-button:hover {
+    background: #135e96;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .dots-event-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .dots-events-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .dots-confirmation-actions {
+        flex-direction: column;
+    }
+}
+
