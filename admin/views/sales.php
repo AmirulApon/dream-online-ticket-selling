@@ -10,6 +10,18 @@ $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_sym
 <div class="wrap dots-sales">
     <h1><?php _e('Sales & Reports', 'dream-ticket'); ?></h1>
     
+    <div style="margin: 20px 0;">
+        <form method="post" action="" style="display: inline-block;">
+            <?php wp_nonce_field('dots_flush_rewrite'); ?>
+            <button type="submit" name="flush_rewrite_rules" class="button">
+                <?php _e('Flush Rewrite Rules', 'dream-ticket'); ?>
+            </button>
+        </form>
+        <p class="description" style="display: inline-block; margin-left: 10px;">
+            <?php _e('Click this if QR codes or ticket URLs are not working.', 'dream-ticket'); ?>
+        </p>
+    </div>
+    
     <div class="dots-sales-stats">
         <?php
         global $wpdb;
@@ -39,7 +51,7 @@ $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_sym
                 <th><?php _e('Order Number', 'dream-ticket'); ?></th>
                 <th><?php _e('Customer', 'dream-ticket'); ?></th>
                 <th><?php _e('Event', 'dream-ticket'); ?></th>
-                <th><?php _e('Ticket Type', 'dream-ticket'); ?></th>
+                <th><?php _e('Event Type', 'dream-ticket'); ?></th>
                 <th><?php _e('Quantity', 'dream-ticket'); ?></th>
                 <th><?php _e('Unit Price', 'dream-ticket'); ?></th>
                 <th><?php _e('Total Price', 'dream-ticket'); ?></th>
@@ -47,6 +59,7 @@ $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_sym
                 <th><?php _e('Transaction ID', 'dream-ticket'); ?></th>
                 <th><?php _e('Date', 'dream-ticket'); ?></th>
                 <th><?php _e('Status', 'dream-ticket'); ?></th>
+                <th><?php _e('Actions', 'dream-ticket'); ?></th>
             </tr>
         </thead>
         <tbody>
@@ -56,7 +69,7 @@ $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_sym
                         <td><?php echo esc_html($sale->order_number); ?></td>
                         <td><?php echo esc_html($sale->customer_name); ?></td>
                         <td><?php echo esc_html($sale->event_name); ?></td>
-                        <td><?php echo esc_html($sale->ticket_category_name); ?></td>
+                        <td><?php echo esc_html(isset($sale->event_type) && !empty($sale->event_type) ? $sale->event_type : '-'); ?></td>
                         <td><?php echo esc_html($sale->quantity); ?></td>
                         <td><?php echo $currency_symbol . number_format($sale->unit_price, 2); ?></td>
                         <td><?php echo $currency_symbol . number_format($sale->total_price, 2); ?></td>
@@ -68,11 +81,23 @@ $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_sym
                                 <?php echo esc_html(ucfirst($sale->payment_status)); ?>
                             </span>
                         </td>
+                        <td>
+                            <a href="<?php echo home_url('/dream-tickets/ticket/' . urlencode($sale->order_number)); ?>" target="_blank" class="button button-small">
+                                <?php _e('View Ticket', 'dream-ticket'); ?>
+                            </a>
+                            <form method="post" action="" style="display: inline-block; margin-left: 5px;">
+                                <?php wp_nonce_field('dots_regenerate_qr'); ?>
+                                <input type="hidden" name="order_number" value="<?php echo esc_attr($sale->order_number); ?>">
+                                <button type="submit" name="regenerate_qr" class="button button-small">
+                                    <?php _e('Regenerate QR', 'dream-ticket'); ?>
+                                </button>
+                            </form>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
             <?php else: ?>
                 <tr>
-                    <td colspan="11"><?php _e('No sales found.', 'dream-ticket'); ?></td>
+                    <td colspan="12"><?php _e('No sales found.', 'dream-ticket'); ?></td>
                 </tr>
             <?php endif; ?>
         </tbody>

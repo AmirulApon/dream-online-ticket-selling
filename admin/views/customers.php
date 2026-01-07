@@ -22,7 +22,7 @@ $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_sym
                 <th><?php _e('Email', 'dream-ticket'); ?></th>
                 <th><?php _e('Phone', 'dream-ticket'); ?></th>
                 <th><?php _e('Event', 'dream-ticket'); ?></th>
-                <th><?php _e('Ticket Type', 'dream-ticket'); ?></th>
+                <th><?php _e('Event Type', 'dream-ticket'); ?></th>
                 <th><?php _e('Quantity', 'dream-ticket'); ?></th>
                 <th><?php _e('Total Price', 'dream-ticket'); ?></th>
                 <th><?php _e('Purchase Date', 'dream-ticket'); ?></th>
@@ -38,7 +38,7 @@ $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_sym
                         <td><?php echo esc_html($sale->customer_email); ?></td>
                         <td><?php echo esc_html($sale->customer_phone); ?></td>
                         <td><?php echo esc_html($sale->event_name); ?></td>
-                        <td><?php echo esc_html($sale->ticket_category_name); ?></td>
+                        <td><?php echo esc_html(isset($sale->event_type) && !empty($sale->event_type) ? $sale->event_type : '-'); ?></td>
                         <td><?php echo esc_html($sale->quantity); ?></td>
                         <td><?php echo $currency_symbol . number_format($sale->total_price, 2); ?></td>
                         <td><?php echo date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($sale->created_at)); ?></td>

@@ -16,15 +16,8 @@ $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_sym
         <div class="dots-events-grid">
             <?php foreach ($events as $event): ?>
                 <?php
-                $categories = DOTS_Database::get_ticket_categories($event->id);
-                $min_price = 0;
-                if (!empty($categories)) {
-                    $prices = array();
-                    foreach ($categories as $cat) {
-                        $prices[] = floatval($cat->price);
-                    }
-                    $min_price = !empty($prices) ? min($prices) : 0;
-                }
+                $ticket_price = isset($event->ticket_price) ? floatval($event->ticket_price) : 0;
+                $tickets_available = isset($event->tickets_available) ? intval($event->tickets_available) : 0;
                 ?>
                 <div class="dots-event-card">
                     <?php if ($event->banner_url): ?>
@@ -52,8 +45,15 @@ $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_sym
                             <p class="dots-event-description"><?php echo wp_trim_words(strip_tags($event->description), 20); ?></p>
                         <?php endif; ?>
                         <div class="dots-event-footer">
-                            <?php if ($min_price > 0): ?>
-                                <span class="dots-event-price"><?php echo $currency_symbol . number_format($min_price, 2); ?> <?php _e('from', 'dream-ticket'); ?></span>
+                            <?php if ($ticket_price > 0): ?>
+                                <div class="dots-event-price-info">
+                                    <span class="dots-event-price"><?php echo $currency_symbol . number_format($ticket_price, 2); ?></span>
+                                    <?php if ($tickets_available > 0): ?>
+                                        <span class="dots-event-availability"><?php echo $tickets_available; ?> <?php _e('available', 'dream-ticket'); ?></span>
+                                    <?php else: ?>
+                                        <span class="dots-event-sold-out"><?php _e('Sold Out', 'dream-ticket'); ?></span>
+                                    <?php endif; ?>
+                                </div>
                             <?php endif; ?>
                             <a href="<?php echo home_url('/dream-tickets/event/' . $event->id); ?>" class="dots-event-button">
                                 <?php _e('View Details', 'dream-ticket'); ?>

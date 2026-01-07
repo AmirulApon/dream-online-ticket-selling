@@ -2,40 +2,78 @@ jQuery(document).ready(function($) {
     
     // Calculate Price
     function calculatePrice() {
-        var categorySelect = $('#ticket_category');
         var quantityInput = $('#ticket_quantity');
-        var price = 0;
-        
-        if (categorySelect.length && categorySelect.val()) {
-            var selectedOption = categorySelect.find('option:selected');
-            var unitPrice = parseFloat(selectedOption.data('price')) || 0;
-            var quantity = parseInt(quantityInput.val()) || 0;
-            var maxQuantity = parseInt(selectedOption.data('max')) || 10;
-            
-            // Validate quantity
-            if (quantity > maxQuantity) {
-                quantity = maxQuantity;
-                quantityInput.val(maxQuantity);
-            }
-            
-            var availability = parseInt(selectedOption.data('availability')) || 0;
-            if (quantity > availability) {
-                quantity = availability;
-                quantityInput.val(availability);
-            }
-            
-            price = unitPrice * quantity;
-            
-            // Update quantity info
-            $('.dots-quantity-info').text('Max ' + maxQuantity + ' per customer. ' + availability + ' available.');
+        if (!quantityInput.length) {
+            return; // Form not on page
         }
         
-        var discount = parseFloat($('#dots-discount').data('amount')) || 0;
-        var total = price - discount;
-        var currencySymbol = dotsFrontend.currency_symbol || '$';
+        var quantity = parseInt(quantityInput.val()) || 1;
+        var currencySymbol = (typeof dotsFrontend !== 'undefined' && dotsFrontend.currency_symbol) ? dotsFrontend.currency_symbol : '$';
         
-        $('#dots-subtotal').text(currencySymbol + price.toFixed(2));
-        $('#dots-total').text(currencySymbol + (total > 0 ? total : 0).toFixed(2));
+        var unitPrice = 0;
+        var maxQuantity = 10;
+        var availability = 0;
+        
+        // Try to get from form data attribute first (most reliable on page)
+        var form = $('#dots-ticket-purchase-form');
+        if (form.length) {
+            unitPrice = parseFloat(form.data('ticket-price')) || 0;
+        }
+        
+        // If not in data attribute, try localized data
+        if (unitPrice <= 0 && typeof dotsFrontend !== 'undefined') {
+            unitPrice = parseFloat(dotsFrontend.event_ticket_price) || 0;
+            maxQuantity = parseInt(dotsFrontend.event_max_tickets_per_customer) || 10;
+            availability = parseInt(dotsFrontend.event_tickets_available) || 0;
+        }
+        
+        // If still not found, try to get from price display
+        if (unitPrice <= 0) {
+            var priceBox = $('.dots-price-amount');
+            if (priceBox.length) {
+                // Extract price from displayed text - remove currency symbol and commas
+                var priceText = priceBox.text().replace(currencySymbol, '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim();
+                unitPrice = parseFloat(priceText) || 0;
+            }
+        }
+        
+        // Debug logging
+        console.log('Price calculation:', {
+            unitPrice: unitPrice,
+            quantity: quantity,
+            fromDataAttr: form.length ? form.data('ticket-price') : 'N/A',
+            fromLocalized: typeof dotsFrontend !== 'undefined' ? dotsFrontend.event_ticket_price : 'N/A'
+        });
+        
+        // Validate quantity
+        if (quantity < 1) {
+            quantity = 1;
+            quantityInput.val(1);
+        }
+        
+        if (maxQuantity > 0 && quantity > maxQuantity) {
+            quantity = maxQuantity;
+            quantityInput.val(maxQuantity);
+        }
+        
+        if (availability > 0 && quantity > availability) {
+            quantity = availability;
+            quantityInput.val(availability);
+        }
+        
+        // Calculate prices
+        var price = unitPrice * quantity;
+        var discount = parseFloat($('#dots-discount').data('amount')) || 0;
+        var total = Math.max(0, price - discount);
+        
+        // Update display
+        if (unitPrice > 0) {
+            $('#dots-subtotal').text(currencySymbol + price.toFixed(2));
+            $('#dots-total').text(currencySymbol + total.toFixed(2));
+        } else {
+            $('#dots-subtotal').text(currencySymbol + '0.00');
+            $('#dots-total').text(currencySymbol + '0.00');
+        }
         
         if (discount > 0) {
             $('.dots-discount').show();
@@ -45,22 +83,71 @@ jQuery(document).ready(function($) {
         }
     }
     
-    // Update price on change
-    $('#ticket_category, #ticket_quantity').on('change input', function() {
+    // Update price on quantity change
+    $('#ticket_quantity').on('change input', function() {
         calculatePrice();
     });
+    
+    // Legacy support for dropdown (if used)
+    $('#ticket_category').on('change', function() {
+        calculatePrice();
+        updateAvailability();
+    });
+    
+    // Update availability display (for dropdown)
+    function updateAvailability() {
+        var categorySelect = $('#ticket_category');
+        var availabilityDisplay = $('#dots-availability-display');
+        var availabilityCount = $('#dots-availability-count');
+        
+        if (categorySelect.length && categorySelect.val()) {
+            var selectedOption = categorySelect.find('option:selected');
+            var availability = parseInt(selectedOption.data('availability')) || 0;
+            
+            if (availability > 0) {
+                availabilityDisplay.show();
+                availabilityCount.text(availability);
+                availabilityCount.removeClass('dots-sold-out').addClass('dots-available');
+            } else {
+                availabilityDisplay.show();
+                availabilityCount.text('Sold Out');
+                availabilityCount.removeClass('dots-available').addClass('dots-sold-out');
+            }
+        } else {
+            availabilityDisplay.hide();
+        }
+    }
     
     // Apply Promo Code
     $('.dots-apply-promo').on('click', function(e) {
         e.preventDefault();
-        var promoCode = $('#promo_code').val();
+        var promoCode = $('#promo_code').val().trim().toUpperCase();
         var currencySymbol = dotsFrontend.currency_symbol || '$';
-        var total = parseFloat($('#dots-subtotal').text().replace(currencySymbol, '').replace(/[^0-9.]/g, ''));
+        
+        // Get current subtotal
+        var unitPrice = parseFloat(dotsFrontend.event_ticket_price) || 0;
+        var quantity = parseInt($('#ticket_quantity').val()) || 1;
+        var total = unitPrice * quantity;
+        
+        // If not in localized data, try to get from display
+        if (total <= 0) {
+            var subtotalText = $('#dots-subtotal').text().replace(currencySymbol, '').replace(/[^0-9.]/g, '');
+            total = parseFloat(subtotalText) || 0;
+        }
         
         if (!promoCode) {
             alert('Please enter a promo code.');
             return;
         }
+        
+        if (total <= 0) {
+            alert('Please select ticket quantity first.');
+            return;
+        }
+        
+        var $btn = $(this);
+        var originalText = $btn.text();
+        $btn.prop('disabled', true).text('Applying...');
         
         $.ajax({
             url: dotsFrontend.ajax_url,
@@ -72,14 +159,27 @@ jQuery(document).ready(function($) {
                 total: total
             },
             success: function(response) {
+                $btn.prop('disabled', false).text(originalText);
+                
                 if (response.success) {
-                    var discount = response.data.discount || 0;
+                    var discount = parseFloat(response.data.discount) || 0;
                     $('#dots-discount').data('amount', discount);
                     calculatePrice();
-                    alert('Promo code applied!');
+                    
+                    // Show success message
+                    var $message = $('.dots-form-message');
+                    $message.removeClass('error').addClass('success').text(response.data.message || 'Promo code applied!').show();
+                    setTimeout(function() {
+                        $message.fadeOut();
+                    }, 3000);
                 } else {
-                    alert(response.data.message || 'Invalid promo code.');
+                    var errorMsg = response.data && response.data.message ? response.data.message : 'Invalid promo code.';
+                    alert(errorMsg);
                 }
+            },
+            error: function() {
+                $btn.prop('disabled', false).text(originalText);
+                alert('An error occurred. Please try again.');
             }
         });
     });
@@ -122,29 +222,112 @@ jQuery(document).ready(function($) {
             }
         });
         
-        formData += '&customer_data=' + JSON.stringify(customerData);
+        formData += '&customer_data=' + encodeURIComponent(JSON.stringify(customerData));
+        
+        // Show loading message
+        $message.removeClass('error').addClass('success').text('Processing your order...').show();
         
         $.ajax({
             url: dotsFrontend.ajax_url,
             type: 'POST',
             data: formData,
+            dataType: 'json',
+            timeout: 30000,
             success: function(response) {
-                if (response.success) {
-                    // Redirect to confirmation page
-                    window.location.href = response.data.redirect_url;
+                console.log('Purchase response:', response);
+                
+                if (response && response.success) {
+                    // Check if payment redirect is needed
+                    if (response.data.redirect && response.data.redirect_url) {
+                        // PayPal redirect
+                        $message.text('Redirecting to payment...').show();
+                        window.location.href = response.data.redirect_url;
+                    } else if (response.data.stripe && response.data.client_secret) {
+                        // Stripe payment - handle with Stripe.js
+                        handleStripePayment(response.data.client_secret, response.data.payment_intent_id, response.data.order_number);
+                    } else if (response.data.redirect_url) {
+                        // Bank transfer or other - redirect to confirmation
+                        $message.text('Order successful! Redirecting...').show();
+                        setTimeout(function() {
+                            window.location.href = response.data.redirect_url;
+                        }, 500);
+                    } else if (response.data.order_number) {
+                        // Direct redirect to order confirmation
+                        $message.text('Order created! Redirecting...').show();
+                        var orderUrl = dotsFrontend.ajax_url.replace('admin-ajax.php', '') + 'dream-tickets/order/' + response.data.order_number;
+                        setTimeout(function() {
+                            window.location.href = orderUrl;
+                        }, 1000);
+                    } else {
+                        $message.removeClass('success').addClass('error').text('Invalid response from server.').show();
+                        $submitBtn.prop('disabled', false).text('Purchase Tickets');
+                    }
                 } else {
-                    $message.removeClass('success').addClass('error').text(response.data.message || 'An error occurred. Please try again.').show();
+                    var errorMsg = (response && response.data && response.data.message) ? response.data.message : 'An error occurred. Please try again.';
+                    $message.removeClass('success').addClass('error').text(errorMsg).show();
                     $submitBtn.prop('disabled', false).text('Purchase Tickets');
                 }
             },
-            error: function() {
-                $message.removeClass('success').addClass('error').text('An error occurred. Please try again.').show();
+            error: function(xhr, status, error) {
+                console.error('Purchase error:', xhr, status, error);
+                var errorMsg = 'An error occurred. Please try again.';
+                
+                if (xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) {
+                    errorMsg = xhr.responseJSON.data.message;
+                } else if (xhr.responseText) {
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        if (response.data && response.data.message) {
+                            errorMsg = response.data.message;
+                        }
+                    } catch(e) {
+                        // Not JSON, use default message
+                    }
+                }
+                
+                $message.removeClass('success').addClass('error').text(errorMsg).show();
                 $submitBtn.prop('disabled', false).text('Purchase Tickets');
             }
         });
     });
     
-    // Initial price calculation
-    calculatePrice();
+    // Handle Stripe payment
+    function handleStripePayment(clientSecret, paymentIntentId, orderNumber) {
+        // Note: This requires Stripe.js to be loaded
+        // For now, we'll show a message to complete payment
+        if (typeof Stripe !== 'undefined') {
+            var stripe = Stripe(dotsFrontend.stripe_publishable_key);
+            stripe.confirmCardPayment(clientSecret).then(function(result) {
+                if (result.error) {
+                    alert('Payment failed: ' + result.error.message);
+                } else {
+                    // Payment succeeded
+                    window.location.href = dotsFrontend.ajax_url + '?action=dots_verify_payment&payment_id=' + paymentIntentId + '&payment_method=stripe&order_number=' + orderNumber + '&nonce=' + dotsFrontend.nonce;
+                }
+            });
+        } else {
+            alert('Stripe.js is not loaded. Please contact the site administrator.');
+        }
+    }
+    
+    // Initial price calculation - trigger on page load
+    if ($('#dots-ticket-purchase-form').length) {
+        // Wait a bit for everything to load
+        setTimeout(function() {
+            calculatePrice();
+        }, 100);
+        
+        // Also trigger after a longer delay to ensure DOM is ready
+        setTimeout(function() {
+            calculatePrice();
+        }, 500);
+        
+        // Trigger calculation when page becomes visible
+        $(document).on('visibilitychange', function() {
+            if (!document.hidden) {
+                calculatePrice();
+            }
+        });
+    }
 });
 

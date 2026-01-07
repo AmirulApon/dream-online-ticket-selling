@@ -61,6 +61,9 @@ class Dream_Online_Ticket_Selling {
         // Create database tables
         DOTS_Database::create_tables();
         
+        // Create default custom fields
+        DOTS_Database::create_default_fields();
+        
         // Set default options
         $default_options = array(
             'currency' => 'USD',

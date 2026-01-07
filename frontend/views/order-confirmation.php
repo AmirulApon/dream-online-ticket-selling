@@ -49,8 +49,8 @@ $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_sym
                         <span><?php echo esc_html($event->location); ?></span>
                     </div>
                     <div class="dots-info-row">
-                        <strong><?php _e('Ticket Type:', 'dream-ticket'); ?></strong>
-                        <span><?php echo esc_html($sale->ticket_category_name); ?></span>
+                        <strong><?php _e('Ticket Price:', 'dream-ticket'); ?></strong>
+                        <span><?php echo $currency_symbol . number_format($sale->unit_price, 2); ?> <?php _e('per ticket', 'dream-ticket'); ?></span>
                     </div>
                     <div class="dots-info-row">
                         <strong><?php _e('Quantity:', 'dream-ticket'); ?></strong>
@@ -71,7 +71,26 @@ $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_sym
                 <?php if ($sale->qr_code): ?>
                     <div class="dots-qr-code">
                         <h3><?php _e('Your Ticket QR Code', 'dream-ticket'); ?></h3>
-                        <img src="<?php echo esc_url($sale->qr_code); ?>" alt="<?php _e('QR Code', 'dream-ticket'); ?>">
+                        <img src="<?php echo esc_url($sale->qr_code); ?>" 
+                             alt="<?php _e('QR Code', 'dream-ticket'); ?>"
+                             onerror="this.onerror=null; this.src='https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=<?php echo urlencode(home_url('/dream-tickets/ticket/' . $sale->order_number)); ?>';">
+                        <p><?php _e('Present this QR code at the event for entry.', 'dream-ticket'); ?></p>
+                        <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                            <strong><?php _e('Ticket URL:', 'dream-ticket'); ?></strong><br>
+                            <a href="<?php echo home_url('/dream-tickets/ticket/' . $sale->order_number); ?>" target="_blank" style="word-break: break-all;">
+                                <?php echo home_url('/dream-tickets/ticket/' . $sale->order_number); ?>
+                            </a>
+                        </p>
+                    </div>
+                <?php else: ?>
+                    <div class="dots-qr-code">
+                        <h3><?php _e('Your Ticket QR Code', 'dream-ticket'); ?></h3>
+                        <?php 
+                        // Generate QR code on the fly if not stored
+                        $ticket_url = home_url('/dream-tickets/ticket/' . $sale->order_number);
+                        $qr_url = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' . urlencode($ticket_url);
+                        ?>
+                        <img src="<?php echo esc_url($qr_url); ?>" alt="<?php _e('QR Code', 'dream-ticket'); ?>">
                         <p><?php _e('Present this QR code at the event for entry.', 'dream-ticket'); ?></p>
                     </div>
                 <?php endif; ?>

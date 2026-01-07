@@ -27,12 +27,32 @@ class DOTS_Database {
             event_time time NOT NULL,
             location varchar(255) NOT NULL,
             banner_url varchar(500),
+            ticket_price decimal(10,2) DEFAULT 0,
             max_tickets int(11) DEFAULT 0,
+            tickets_available int(11) DEFAULT 0,
             status varchar(20) DEFAULT 'draft',
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id)
         ) $charset_collate;";
+        
+        // Add ticket_price column if it doesn't exist
+        $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_events LIKE 'ticket_price'");
+        if (empty($column_exists)) {
+            $wpdb->query("ALTER TABLE $table_events ADD COLUMN ticket_price decimal(10,2) DEFAULT 0 AFTER location");
+        }
+        
+        // Add tickets_available column if it doesn't exist
+        $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_events LIKE 'tickets_available'");
+        if (empty($column_exists)) {
+            $wpdb->query("ALTER TABLE $table_events ADD COLUMN tickets_available int(11) DEFAULT 0 AFTER max_tickets");
+        }
+        
+        // Add event_type column if it doesn't exist
+        $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_events LIKE 'event_type'");
+        if (empty($column_exists)) {
+            $wpdb->query("ALTER TABLE $table_events ADD COLUMN event_type varchar(100) DEFAULT NULL AFTER name");
+        }
         
         // Ticket categories table
         $table_categories = $wpdb->prefix . 'dots_ticket_categories';
@@ -75,6 +95,26 @@ class DOTS_Database {
             KEY email (email)
         ) $charset_collate;";
         
+        // Promo codes table
+        $table_promo_codes = $wpdb->prefix . 'dots_promo_codes';
+        $sql_promo_codes = "CREATE TABLE IF NOT EXISTS $table_promo_codes (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            code varchar(50) NOT NULL,
+            discount_type varchar(20) NOT NULL DEFAULT 'percentage',
+            discount_value decimal(10,2) NOT NULL,
+            min_amount decimal(10,2) DEFAULT 0,
+            max_discount decimal(10,2) DEFAULT 0,
+            usage_limit int(11) DEFAULT 0,
+            used_count int(11) DEFAULT 0,
+            start_date date,
+            end_date date,
+            status varchar(20) DEFAULT 'active',
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY code (code)
+        ) $charset_collate;";
+        
         // Sales table
         $table_sales = $wpdb->prefix . 'dots_sales';
         $sql_sales = "CREATE TABLE IF NOT EXISTS $table_sales (
@@ -106,6 +146,7 @@ class DOTS_Database {
         dbDelta($sql_categories);
         dbDelta($sql_fields);
         dbDelta($sql_customers);
+        dbDelta($sql_promo_codes);
         dbDelta($sql_sales);
     }
     
@@ -169,6 +210,92 @@ class DOTS_Database {
     }
     
     /**
+     * Get promo code
+     */
+    public static function get_promo_code($code) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'dots_promo_codes';
+        return $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table WHERE code = %s AND status = 'active'",
+            strtoupper($code)
+        ));
+    }
+    
+    /**
+     * Get all promo codes
+     */
+    public static function get_promo_codes() {
+        global $wpdb;
+        $table = $wpdb->prefix . 'dots_promo_codes';
+        return $wpdb->get_results("SELECT * FROM $table ORDER BY created_at DESC");
+    }
+    
+    /**
+     * Increment promo code usage
+     */
+    public static function increment_promo_usage($code_id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'dots_promo_codes';
+        $wpdb->query($wpdb->prepare(
+            "UPDATE $table SET used_count = used_count + 1 WHERE id = %d",
+            $code_id
+        ));
+    }
+    
+    /**
+     * Create default custom fields (name, email, phone, address)
+     */
+    public static function create_default_fields() {
+        global $wpdb;
+        $table = $wpdb->prefix . 'dots_custom_fields';
+        
+        // Check if default fields already exist
+        $existing_fields = $wpdb->get_col("SELECT field_name FROM $table WHERE field_name IN ('name', 'email', 'phone', 'address')");
+        
+        $default_fields = array(
+            array(
+                'field_name' => 'name',
+                'field_label' => __('Full Name', 'dream-ticket'),
+                'field_type' => 'text',
+                'field_options' => '',
+                'is_required' => 1,
+                'field_order' => 1
+            ),
+            array(
+                'field_name' => 'email',
+                'field_label' => __('Email Address', 'dream-ticket'),
+                'field_type' => 'email',
+                'field_options' => '',
+                'is_required' => 1,
+                'field_order' => 2
+            ),
+            array(
+                'field_name' => 'phone',
+                'field_label' => __('Mobile Number', 'dream-ticket'),
+                'field_type' => 'tel',
+                'field_options' => '',
+                'is_required' => 1,
+                'field_order' => 3
+            ),
+            array(
+                'field_name' => 'address',
+                'field_label' => __('Address', 'dream-ticket'),
+                'field_type' => 'textarea',
+                'field_options' => '',
+                'is_required' => 0,
+                'field_order' => 4
+            )
+        );
+        
+        foreach ($default_fields as $field) {
+            // Only insert if it doesn't exist
+            if (!in_array($field['field_name'], $existing_fields)) {
+                $wpdb->insert($table, $field);
+            }
+        }
+    }
+    
+    /**
      * Get sales
      */
     public static function get_sales($args = array()) {
@@ -208,7 +335,7 @@ class DOTS_Database {
             $limit = $wpdb->prepare("LIMIT %d OFFSET %d", $args['limit'], $args['offset']);
         }
         
-        $sql = "SELECT s.*, e.name as event_name, c.name as customer_name, c.email as customer_email, 
+        $sql = "SELECT s.*, e.name as event_name, e.event_type as event_type, c.name as customer_name, c.email as customer_email, 
                 c.phone as customer_phone, tc.name as ticket_category_name
                 FROM $table_sales s
                 LEFT JOIN $table_events e ON s.event_id = e.id

@@ -5,18 +5,40 @@ if (!defined('ABSPATH')) {
 
 $event_id = isset($event) && $event ? $event->id : 0;
 $event_name = $event ? $event->name : '';
+$event_type = isset($event->event_type) ? $event->event_type : '';
 $event_description = $event ? $event->description : '';
 $event_date = $event ? $event->event_date : date('Y-m-d');
 $event_time = $event ? $event->event_time : '19:00';
 $event_location = $event ? $event->location : '';
 $event_banner = $event ? $event->banner_url : '';
-$event_max_tickets = $event ? $event->max_tickets : 0;
+$event_ticket_price = isset($event->ticket_price) ? $event->ticket_price : 0;
+$event_max_tickets = isset($event->max_tickets) ? $event->max_tickets : 0;
+$event_tickets_available = isset($event->tickets_available) ? $event->tickets_available : 0;
 $event_status = $event ? $event->status : 'draft';
-$categories = isset($categories) ? $categories : array();
 ?>
 
 <div class="wrap dots-event-edit">
     <h1><?php echo $event_id > 0 ? __('Edit Event', 'dream-ticket') : __('Add New Event', 'dream-ticket'); ?></h1>
+    
+    <?php if ($event_id > 0): ?>
+        <div style="background: #f0f6fc; border-left: 4px solid #2271b1; padding: 12px 15px; margin: 15px 0; border-radius: 4px;">
+            <strong><?php _e('Event ID:', 'dream-ticket'); ?></strong>
+            <code style="background: #fff; padding: 4px 8px; border-radius: 3px; font-size: 14px; font-weight: 600; color: #2271b1; margin: 0 10px;">
+                <?php echo esc_html($event_id); ?>
+            </code>
+            <button type="button" 
+                    class="button button-small dots-copy-event-id-edit" 
+                    data-event-id="<?php echo esc_attr($event_id); ?>"
+                    style="margin-left: 10px;">
+                <span class="dashicons dashicons-admin-page" style="vertical-align: middle;"></span>
+                <?php _e('Copy Shortcode', 'dream-ticket'); ?>
+            </button>
+            <p style="margin: 8px 0 0 0; font-size: 12px; color: #646970;">
+                <?php _e('Use this ID in the shortcode:', 'dream-ticket'); ?> 
+                <code>[dream_ticket_form event_id="<?php echo esc_html($event_id); ?>"]</code>
+            </p>
+        </div>
+    <?php endif; ?>
     
     <form id="dots-event-form" method="post">
         <div class="dots-form-grid">
@@ -28,6 +50,26 @@ $categories = isset($categories) ? $categories : array();
                         <tr>
                             <th><label for="event_name"><?php _e('Event Name', 'dream-ticket'); ?> <span class="required">*</span></label></th>
                             <td><input type="text" id="event_name" name="name" value="<?php echo esc_attr($event_name); ?>" class="regular-text" required></td>
+                        </tr>
+                        <tr>
+                            <th><label for="event_type"><?php _e('Event Type', 'dream-ticket'); ?></label></th>
+                            <td>
+                                <select id="event_type" name="event_type" class="regular-text">
+                                    <option value=""><?php _e('-- Select Event Type (Optional) --', 'dream-ticket'); ?></option>
+                                    <option value="Concert" <?php selected($event_type, 'Concert'); ?>><?php _e('Concert', 'dream-ticket'); ?></option>
+                                    <option value="Conference" <?php selected($event_type, 'Conference'); ?>><?php _e('Conference', 'dream-ticket'); ?></option>
+                                    <option value="Workshop" <?php selected($event_type, 'Workshop'); ?>><?php _e('Workshop', 'dream-ticket'); ?></option>
+                                    <option value="Seminar" <?php selected($event_type, 'Seminar'); ?>><?php _e('Seminar', 'dream-ticket'); ?></option>
+                                    <option value="Sports" <?php selected($event_type, 'Sports'); ?>><?php _e('Sports', 'dream-ticket'); ?></option>
+                                    <option value="Festival" <?php selected($event_type, 'Festival'); ?>><?php _e('Festival', 'dream-ticket'); ?></option>
+                                    <option value="Exhibition" <?php selected($event_type, 'Exhibition'); ?>><?php _e('Exhibition', 'dream-ticket'); ?></option>
+                                    <option value="Theater" <?php selected($event_type, 'Theater'); ?>><?php _e('Theater', 'dream-ticket'); ?></option>
+                                    <option value="Comedy Show" <?php selected($event_type, 'Comedy Show'); ?>><?php _e('Comedy Show', 'dream-ticket'); ?></option>
+                                    <option value="Networking" <?php selected($event_type, 'Networking'); ?>><?php _e('Networking', 'dream-ticket'); ?></option>
+                                    <option value="Other" <?php selected($event_type, 'Other'); ?>><?php _e('Other', 'dream-ticket'); ?></option>
+                                </select>
+                                <p class="description"><?php _e('Optional: Categorize your event for better organization.', 'dream-ticket'); ?></p>
+                            </td>
                         </tr>
                         <tr>
                             <th><label for="event_description"><?php _e('Description', 'dream-ticket'); ?></label></th>
@@ -64,8 +106,24 @@ $categories = isset($categories) ? $categories : array();
                             </td>
                         </tr>
                         <tr>
-                            <th><label for="event_max_tickets"><?php _e('Maximum Tickets', 'dream-ticket'); ?></label></th>
-                            <td><input type="number" id="event_max_tickets" name="max_tickets" value="<?php echo esc_attr($event_max_tickets); ?>" min="0"></td>
+                            <th><label for="event_ticket_price"><?php _e('Ticket Price', 'dream-ticket'); ?> <span class="required">*</span></label></th>
+                            <td>
+                                <?php
+                                $settings = get_option('dots_settings', array());
+                                $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_symbol'] : '$';
+                                ?>
+                                <span style="font-size: 18px; font-weight: 600; margin-right: 10px;"><?php echo $currency_symbol; ?></span>
+                                <input type="number" id="event_ticket_price" name="ticket_price" value="<?php echo esc_attr($event_ticket_price); ?>" step="0.01" min="0" class="regular-text" required>
+                                <p class="description"><?php _e('Price per ticket', 'dream-ticket'); ?></p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="event_tickets_available"><?php _e('Tickets Available', 'dream-ticket'); ?> <span class="required">*</span></label></th>
+                            <td><input type="number" id="event_tickets_available" name="tickets_available" value="<?php echo esc_attr($event_tickets_available); ?>" min="0" class="regular-text" required></td>
+                        </tr>
+                        <tr>
+                            <th><label for="event_max_tickets"><?php _e('Max Tickets per Customer', 'dream-ticket'); ?></label></th>
+                            <td><input type="number" id="event_max_tickets" name="max_tickets" value="<?php echo esc_attr($event_max_tickets); ?>" min="1" class="small-text"></td>
                         </tr>
                         <tr>
                             <th><label for="event_status"><?php _e('Status', 'dream-ticket'); ?></label></th>
@@ -78,24 +136,6 @@ $categories = isset($categories) ? $categories : array();
                         </tr>
                     </table>
                 </div>
-                
-                <div class="dots-form-section">
-                    <h2><?php _e('Ticket Categories', 'dream-ticket'); ?></h2>
-                    <div id="dots-ticket-categories">
-                        <?php if (!empty($categories)): ?>
-                            <?php foreach ($categories as $index => $cat): ?>
-                                <div class="dots-category-item">
-                                    <input type="text" name="categories[<?php echo $index; ?>][name]" placeholder="<?php _e('Category Name', 'dream-ticket'); ?>" value="<?php echo esc_attr($cat->name); ?>" required>
-                                    <input type="number" step="0.01" name="categories[<?php echo $index; ?>][price]" placeholder="<?php _e('Price', 'dream-ticket'); ?>" value="<?php echo esc_attr($cat->price); ?>" required>
-                                    <input type="number" name="categories[<?php echo $index; ?>][availability]" placeholder="<?php _e('Availability', 'dream-ticket'); ?>" value="<?php echo esc_attr($cat->availability); ?>" required>
-                                    <input type="number" name="categories[<?php echo $index; ?>][max_per_customer]" placeholder="<?php _e('Max per Customer', 'dream-ticket'); ?>" value="<?php echo esc_attr($cat->max_per_customer); ?>">
-                                    <button type="button" class="button dots-remove-category"><?php _e('Remove', 'dream-ticket'); ?></button>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
-                    <button type="button" class="button" id="dots-add-category"><?php _e('Add Category', 'dream-ticket'); ?></button>
-                </div>
             </div>
         </div>
         
@@ -107,13 +147,34 @@ $categories = isset($categories) ? $categories : array();
     </form>
 </div>
 
-<script type="text/html" id="dots-category-template">
-    <div class="dots-category-item">
-        <input type="text" name="categories[{{index}}][name]" placeholder="<?php _e('Category Name', 'dream-ticket'); ?>" required>
-        <input type="number" step="0.01" name="categories[{{index}}][price]" placeholder="<?php _e('Price', 'dream-ticket'); ?>" required>
-        <input type="number" name="categories[{{index}}][availability]" placeholder="<?php _e('Availability', 'dream-ticket'); ?>" required>
-        <input type="number" name="categories[{{index}}][max_per_customer]" placeholder="<?php _e('Max per Customer', 'dream-ticket'); ?>" value="10">
-        <button type="button" class="button dots-remove-category"><?php _e('Remove', 'dream-ticket'); ?></button>
-    </div>
+<?php if ($event_id > 0): ?>
+<script>
+jQuery(document).ready(function($) {
+    $('.dots-copy-event-id-edit').on('click', function(e) {
+        e.preventDefault();
+        var eventId = $(this).data('event-id');
+        var shortcode = '[dream_ticket_form event_id="' + eventId + '"]';
+        
+        // Copy to clipboard
+        var $temp = $('<textarea>');
+        $('body').append($temp);
+        $temp.val(shortcode).select();
+        document.execCommand('copy');
+        $temp.remove();
+        
+        // Show feedback
+        var $btn = $(this);
+        var originalText = $btn.html();
+        $btn.html('<span class="dashicons dashicons-yes-alt" style="vertical-align: middle; color: #00a32a;"></span> <?php echo esc_js(__('Copied!', 'dream-ticket')); ?>');
+        $btn.css('color', '#00a32a');
+        
+        setTimeout(function() {
+            $btn.html(originalText);
+            $btn.css('color', '');
+        }, 2000);
+    });
+});
 </script>
+<?php endif; ?>
+
 

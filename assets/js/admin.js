@@ -8,18 +8,6 @@ jQuery(document).ready(function($) {
         formData.append('action', 'dots_save_event');
         formData.append('nonce', dotsAdmin.nonce);
         
-        // Collect categories
-        var categories = [];
-        $('.dots-category-item').each(function() {
-            var $item = $(this);
-            categories.push({
-                name: $item.find('input[name*="[name]"]').val(),
-                price: $item.find('input[name*="[price]"]').val(),
-                availability: $item.find('input[name*="[availability]"]').val(),
-                max_per_customer: $item.find('input[name*="[max_per_customer]"]').val()
-            });
-        });
-        formData.append('categories', JSON.stringify(categories));
         
         // Get description from editor
         if (typeof tinymce !== 'undefined' && tinymce.get('event_description')) {
@@ -47,20 +35,6 @@ jQuery(document).ready(function($) {
         });
     });
     
-    // Add Category
-    $('#dots-add-category').on('click', function() {
-        var index = $('.dots-category-item').length;
-        var template = $('#dots-category-template').html();
-        template = template.replace(/\{\{index\}\}/g, index);
-        $('#dots-ticket-categories').append(template);
-    });
-    
-    // Remove Category
-    $(document).on('click', '.dots-remove-category', function() {
-        if (confirm(dotsAdmin.strings.confirm_delete)) {
-            $(this).closest('.dots-category-item').remove();
-        }
-    });
     
     // Delete Event
     $(document).on('click', '.dots-delete-event', function(e) {
@@ -238,6 +212,36 @@ jQuery(document).ready(function($) {
         $(this).addClass('nav-tab-active');
         $('.dots-tab-content').hide();
         $(target).show();
+    });
+    
+    // Auto-update currency symbol when currency changes
+    var currencySymbols = {
+        'USD': '$',
+        'EUR': '€',
+        'GBP': '£',
+        'BDT': '৳',
+        'INR': '₹',
+        'AUD': 'A$',
+        'CAD': 'C$',
+        'JPY': '¥',
+        'CNY': '¥',
+        'SGD': 'S$',
+        'AED': 'د.إ',
+        'SAR': '﷼'
+    };
+    
+    $('#currency').on('change', function() {
+        var selectedCurrency = $(this).val();
+        var symbol = currencySymbols[selectedCurrency] || '$';
+        $('#currency_symbol').val(symbol);
+        
+        // Show a brief confirmation
+        var $symbolField = $('#currency_symbol');
+        var originalBg = $symbolField.css('background-color');
+        $symbolField.css('background-color', '#d1e7dd');
+        setTimeout(function() {
+            $symbolField.css('background-color', originalBg);
+        }, 1000);
     });
     
     // Media Uploader for Banner

@@ -25,6 +25,8 @@ class DOTS_Ajax {
         add_action('wp_ajax_nopriv_dots_process_purchase', array($this, 'process_purchase'));
         add_action('wp_ajax_dots_apply_promo', array($this, 'apply_promo'));
         add_action('wp_ajax_nopriv_dots_apply_promo', array($this, 'apply_promo'));
+        add_action('wp_ajax_dots_save_promo_code', array($this, 'save_promo_code'));
+        add_action('wp_ajax_dots_delete_promo_code', array($this, 'delete_promo_code'));
     }
     
     /**
@@ -43,22 +45,27 @@ class DOTS_Ajax {
         
         $event_id = isset($_POST['event_id']) ? intval($_POST['event_id']) : 0;
         $name = sanitize_text_field($_POST['name']);
+        $event_type = isset($_POST['event_type']) ? sanitize_text_field($_POST['event_type']) : '';
         $description = wp_kses_post($_POST['description']);
         $event_date = sanitize_text_field($_POST['event_date']);
         $event_time = sanitize_text_field($_POST['event_time']);
         $location = sanitize_text_field($_POST['location']);
         $banner_url = esc_url_raw($_POST['banner_url']);
-        $max_tickets = intval($_POST['max_tickets']);
+        $ticket_price = isset($_POST['ticket_price']) ? floatval($_POST['ticket_price']) : 0;
+        $tickets_available = isset($_POST['tickets_available']) ? intval($_POST['tickets_available']) : 0;
+        $max_tickets = isset($_POST['max_tickets']) ? intval($_POST['max_tickets']) : 10;
         $status = sanitize_text_field($_POST['status']);
-        $categories = isset($_POST['categories']) ? $_POST['categories'] : array();
         
         $data = array(
             'name' => $name,
+            'event_type' => $event_type,
             'description' => $description,
             'event_date' => $event_date,
             'event_time' => $event_time,
             'location' => $location,
             'banner_url' => $banner_url,
+            'ticket_price' => $ticket_price,
+            'tickets_available' => $tickets_available,
             'max_tickets' => $max_tickets,
             'status' => $status
         );
@@ -68,22 +75,6 @@ class DOTS_Ajax {
         } else {
             $wpdb->insert($table_events, $data);
             $event_id = $wpdb->insert_id;
-        }
-        
-        // Save categories
-        if (!empty($categories)) {
-            // Delete existing categories
-            $wpdb->delete($table_categories, array('event_id' => $event_id));
-            
-            foreach ($categories as $cat) {
-                $wpdb->insert($table_categories, array(
-                    'event_id' => $event_id,
-                    'name' => sanitize_text_field($cat['name']),
-                    'price' => floatval($cat['price']),
-                    'availability' => intval($cat['availability']),
-                    'max_per_customer' => intval($cat['max_per_customer'])
-                ));
-            }
         }
         
         wp_send_json_success(array('event_id' => $event_id, 'message' => __('Event saved successfully.', 'dream-ticket')));
@@ -265,9 +256,21 @@ class DOTS_Ajax {
         global $wpdb;
         
         $event_id = intval($_POST['event_id']);
-        $ticket_category_id = intval($_POST['ticket_category_id']);
         $quantity = intval($_POST['quantity']);
-        $customer_data = $_POST['customer_data'];
+        
+        // Parse customer data (can be JSON string or array)
+        $customer_data = array();
+        if (isset($_POST['customer_data'])) {
+            if (is_string($_POST['customer_data'])) {
+                $customer_data = json_decode(stripslashes($_POST['customer_data']), true);
+                if (!is_array($customer_data)) {
+                    $customer_data = array();
+                }
+            } else {
+                $customer_data = $_POST['customer_data'];
+            }
+        }
+        
         $promo_code = isset($_POST['promo_code']) ? sanitize_text_field($_POST['promo_code']) : '';
         
         // Validate event
@@ -276,34 +279,93 @@ class DOTS_Ajax {
             wp_send_json_error(array('message' => __('Event not available.', 'dream-ticket')));
         }
         
-        // Get ticket category
-        $category = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM {$wpdb->prefix}dots_ticket_categories WHERE id = %d AND event_id = %d",
-            $ticket_category_id, $event_id
-        ));
+        // Get ticket price and availability from event
+        $ticket_price = isset($event->ticket_price) ? floatval($event->ticket_price) : 0;
+        $tickets_available = isset($event->tickets_available) ? intval($event->tickets_available) : 0;
+        $max_tickets_per_customer = isset($event->max_tickets) ? intval($event->max_tickets) : 10;
         
-        if (!$category) {
-            wp_send_json_error(array('message' => __('Ticket category not found.', 'dream-ticket')));
+        if ($ticket_price <= 0) {
+            wp_send_json_error(array('message' => __('Ticket price not set for this event.', 'dream-ticket')));
         }
         
         // Check availability
-        if ($category->availability < $quantity) {
+        if ($tickets_available < $quantity) {
             wp_send_json_error(array('message' => __('Not enough tickets available.', 'dream-ticket')));
         }
         
+        // Check max per customer
+        if ($quantity > $max_tickets_per_customer) {
+            wp_send_json_error(array('message' => sprintf(__('Maximum %d tickets per customer.', 'dream-ticket'), $max_tickets_per_customer)));
+        }
+        
         // Calculate price
-        $unit_price = floatval($category->price);
+        $unit_price = $ticket_price;
         $total_price = $unit_price * $quantity;
         $discount_amount = 0;
         
         // Apply promo code if provided
         if (!empty($promo_code)) {
-            // Promo code logic here
-            // For now, just a placeholder
+            $promo = DOTS_Database::get_promo_code($promo_code);
+            
+            if ($promo && $promo->status === 'active') {
+                // Check date validity
+                $today = date('Y-m-d');
+                $valid_date = true;
+                if (!empty($promo->start_date) && $today < $promo->start_date) {
+                    $valid_date = false;
+                }
+                if (!empty($promo->end_date) && $today > $promo->end_date) {
+                    $valid_date = false;
+                }
+                
+                // Check minimum amount
+                if ($promo->min_amount > 0 && $total_price < $promo->min_amount) {
+                    $valid_date = false;
+                }
+                
+                // Check usage limit
+                if ($promo->usage_limit > 0 && $promo->used_count >= $promo->usage_limit) {
+                    $valid_date = false;
+                }
+                
+                if ($valid_date) {
+                    // Calculate discount
+                    if ($promo->discount_type === 'percentage') {
+                        $discount_amount = ($total_price * $promo->discount_value) / 100;
+                        // Apply max discount if set
+                        if ($promo->max_discount > 0 && $discount_amount > $promo->max_discount) {
+                            $discount_amount = $promo->max_discount;
+                        }
+                    } else {
+                        // Fixed amount
+                        $discount_amount = $promo->discount_value;
+                    }
+                    
+                    // Ensure discount doesn't exceed total
+                    if ($discount_amount > $total_price) {
+                        $discount_amount = $total_price;
+                    }
+                    
+                    // Increment usage count
+                    DOTS_Database::increment_promo_usage($promo->id);
+                }
+            }
         }
         
         // Create or get customer
-        $customer_email = sanitize_email($customer_data['email']);
+        $customer_email = isset($customer_data['email']) ? sanitize_email($customer_data['email']) : '';
+        $customer_name = isset($customer_data['name']) ? sanitize_text_field($customer_data['name']) : '';
+        $customer_phone = isset($customer_data['phone']) ? sanitize_text_field($customer_data['phone']) : '';
+        $customer_address = isset($customer_data['address']) ? sanitize_textarea_field($customer_data['address']) : '';
+        
+        if (empty($customer_email)) {
+            wp_send_json_error(array('message' => __('Email is required.', 'dream-ticket')));
+        }
+        
+        if (empty($customer_name)) {
+            wp_send_json_error(array('message' => __('Name is required.', 'dream-ticket')));
+        }
+        
         $customer = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$wpdb->prefix}dots_customers WHERE email = %s",
             $customer_email
@@ -311,14 +373,24 @@ class DOTS_Ajax {
         
         if (!$customer) {
             $wpdb->insert($wpdb->prefix . 'dots_customers', array(
-                'name' => sanitize_text_field($customer_data['name']),
+                'name' => $customer_name,
                 'email' => $customer_email,
-                'phone' => sanitize_text_field($customer_data['phone']),
-                'address' => sanitize_textarea_field($customer_data['address'])
+                'phone' => $customer_phone,
+                'address' => $customer_address
             ));
             $customer_id = $wpdb->insert_id;
         } else {
             $customer_id = $customer->id;
+            // Update customer info if provided
+            if (!empty($customer_name) || !empty($customer_phone) || !empty($customer_address)) {
+                $update_data = array();
+                if (!empty($customer_name)) $update_data['name'] = $customer_name;
+                if (!empty($customer_phone)) $update_data['phone'] = $customer_phone;
+                if (!empty($customer_address)) $update_data['address'] = $customer_address;
+                if (!empty($update_data)) {
+                    $wpdb->update($wpdb->prefix . 'dots_customers', $update_data, array('id' => $customer_id));
+                }
+            }
         }
         
         // Generate order number
@@ -328,7 +400,7 @@ class DOTS_Ajax {
         $sale_data = array(
             'event_id' => $event_id,
             'customer_id' => $customer_id,
-            'ticket_category_id' => $ticket_category_id,
+            'ticket_category_id' => 0, // Not used anymore
             'quantity' => $quantity,
             'unit_price' => $unit_price,
             'total_price' => $total_price - $discount_amount,
@@ -339,38 +411,110 @@ class DOTS_Ajax {
             'custom_data' => json_encode($customer_data)
         );
         
-        $wpdb->insert($wpdb->prefix . 'dots_sales', $sale_data);
+        $insert_result = $wpdb->insert($wpdb->prefix . 'dots_sales', $sale_data);
+        
+        if ($insert_result === false) {
+            wp_send_json_error(array('message' => __('Failed to create order. Please try again.', 'dream-ticket')));
+        }
+        
         $sale_id = $wpdb->insert_id;
         
         // Generate QR code
         $qr_code = $this->generate_qr_code($order_number);
         $wpdb->update($wpdb->prefix . 'dots_sales', array('qr_code' => $qr_code), array('id' => $sale_id));
         
-        // Process payment (integrate with payment gateway)
-        // For now, just mark as completed
-        $payment_result = array('status' => 'success', 'transaction_id' => 'test-' . time());
+        // Get payment method
+        $payment_method = isset($_POST['payment_method']) ? sanitize_text_field($_POST['payment_method']) : 'bank_transfer';
         
-        if ($payment_result['status'] === 'success') {
-            $wpdb->update($wpdb->prefix . 'dots_sales', array(
-                'payment_status' => 'completed',
-                'payment_method' => 'test',
-                'transaction_id' => $payment_result['transaction_id']
-            ), array('id' => $sale_id));
-            
-            // Update availability
-            $wpdb->query($wpdb->prepare(
-                "UPDATE {$wpdb->prefix}dots_ticket_categories SET availability = availability - %d WHERE id = %d",
-                $quantity, $ticket_category_id
-            ));
-            
-            // Send confirmation email
-            $this->send_confirmation_email($customer_email, $order_number);
-        }
+        $settings = get_option('dots_settings', array());
+        $paypal_enabled = isset($settings['paypal_enabled']) && $settings['paypal_enabled'];
+        $stripe_enabled = isset($settings['stripe_enabled']) && $settings['stripe_enabled'];
+        $sslcommerz_enabled = isset($settings['sslcommerz_enabled']) && $settings['sslcommerz_enabled'];
+        $bank_transfer_enabled = isset($settings['bank_transfer_enabled']) && $settings['bank_transfer_enabled'];
         
-        wp_send_json_success(array(
+        // Initialize payment handler
+        $payment_handler = new DOTS_Payment();
+        $order_data = array(
             'order_number' => $order_number,
-            'redirect_url' => home_url('/dream-tickets/order/' . $order_number)
-        ));
+            'event_id' => $event_id,
+            'event_name' => $event->name,
+            'total_price' => $total_price - $discount_amount,
+            'payment_method' => $payment_method,
+            'return_url' => home_url('/dream-tickets/order/' . $order_number),
+            'customer_name' => $customer_name,
+            'customer_email' => $customer_email,
+            'customer_phone' => $customer_phone,
+            'customer_address' => $customer_address
+        );
+        
+        // Process payment based on method
+        $payment_result = $payment_handler->process_payment($order_data);
+        
+        // Initialize update data
+        $update_data = array(
+            'payment_method' => $payment_method
+        );
+        
+        // Handle payment result
+        if ($payment_result['status'] === 'success') {
+            // Set payment status based on method
+            if ($payment_method === 'bank_transfer') {
+                $update_data['payment_status'] = 'pending';
+                $update_data['transaction_id'] = isset($payment_result['transaction_id']) ? $payment_result['transaction_id'] : '';
+            } else {
+                // PayPal and Stripe are processing until confirmed
+                $update_data['payment_status'] = 'processing';
+                $update_data['transaction_id'] = isset($payment_result['payment_id']) ? $payment_result['payment_id'] : (isset($payment_result['payment_intent_id']) ? $payment_result['payment_intent_id'] : '');
+            }
+            
+            // Update sale record with payment info
+            $wpdb->update($wpdb->prefix . 'dots_sales', $update_data, array('id' => $sale_id));
+            
+            // Handle payment redirects
+            if (isset($payment_result['redirect_url'])) {
+                // SSLCommerz - redirect to payment gateway
+                wp_send_json_success(array(
+                    'redirect' => true,
+                    'redirect_url' => $payment_result['redirect_url'],
+                    'order_number' => $order_number
+                ));
+            } elseif (isset($payment_result['approve_url'])) {
+                // PayPal - redirect to PayPal
+                wp_send_json_success(array(
+                    'redirect' => true,
+                    'redirect_url' => $payment_result['approve_url'],
+                    'order_number' => $order_number
+                ));
+            } elseif (isset($payment_result['client_secret'])) {
+                // Stripe - return client secret for frontend handling
+                wp_send_json_success(array(
+                    'stripe' => true,
+                    'client_secret' => $payment_result['client_secret'],
+                    'payment_intent_id' => $payment_result['payment_intent_id'],
+                    'order_number' => $order_number
+                ));
+            } elseif ($payment_method === 'bank_transfer') {
+                // Bank transfer - redirect to confirmation (payment pending)
+                // Don't update tickets available yet for bank transfer
+                wp_send_json_success(array(
+                    'order_number' => $order_number,
+                    'redirect_url' => home_url('/dream-tickets/order/' . $order_number),
+                    'message' => __('Order created. Payment pending bank transfer.', 'dream-ticket')
+                ));
+            } else {
+                // Fallback - should not reach here
+                wp_send_json_error(array('message' => __('Payment processing failed.', 'dream-ticket')));
+            }
+        } else {
+            // Payment processing failed
+            $error_message = isset($payment_result['message']) ? $payment_result['message'] : __('Payment processing failed.', 'dream-ticket');
+            
+            // Update sale with failed status
+            $update_data['payment_status'] = 'failed';
+            $wpdb->update($wpdb->prefix . 'dots_sales', $update_data, array('id' => $sale_id));
+            
+            wp_send_json_error(array('message' => $error_message));
+        }
     }
     
     /**
@@ -379,12 +523,137 @@ class DOTS_Ajax {
     public function apply_promo() {
         check_ajax_referer('dots_frontend_nonce', 'nonce');
         
-        $promo_code = sanitize_text_field($_POST['promo_code']);
+        $promo_code = strtoupper(sanitize_text_field($_POST['promo_code']));
         $total = floatval($_POST['total']);
         
-        // Promo code validation logic here
-        // For now, return error
-        wp_send_json_error(array('message' => __('Invalid promo code.', 'dream-ticket')));
+        if (empty($promo_code)) {
+            wp_send_json_error(array('message' => __('Please enter a promo code.', 'dream-ticket')));
+        }
+        
+        // Get promo code from database
+        $promo = DOTS_Database::get_promo_code($promo_code);
+        
+        if (!$promo) {
+            wp_send_json_error(array('message' => __('Invalid promo code.', 'dream-ticket')));
+        }
+        
+        // Check if promo code is active
+        if ($promo->status !== 'active') {
+            wp_send_json_error(array('message' => __('This promo code is not active.', 'dream-ticket')));
+        }
+        
+        // Check date validity
+        $today = date('Y-m-d');
+        if (!empty($promo->start_date) && $today < $promo->start_date) {
+            wp_send_json_error(array('message' => __('This promo code is not yet valid.', 'dream-ticket')));
+        }
+        if (!empty($promo->end_date) && $today > $promo->end_date) {
+            wp_send_json_error(array('message' => __('This promo code has expired.', 'dream-ticket')));
+        }
+        
+        // Check minimum amount
+        if ($promo->min_amount > 0 && $total < $promo->min_amount) {
+            $settings = get_option('dots_settings', array());
+            $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_symbol'] : '$';
+            wp_send_json_error(array('message' => sprintf(__('Minimum purchase amount of %s%s required.', 'dream-ticket'), $currency_symbol, number_format($promo->min_amount, 2))));
+        }
+        
+        // Check usage limit
+        if ($promo->usage_limit > 0 && $promo->used_count >= $promo->usage_limit) {
+            wp_send_json_error(array('message' => __('This promo code has reached its usage limit.', 'dream-ticket')));
+        }
+        
+        // Calculate discount
+        $discount = 0;
+        if ($promo->discount_type === 'percentage') {
+            $discount = ($total * $promo->discount_value) / 100;
+            // Apply max discount if set
+            if ($promo->max_discount > 0 && $discount > $promo->max_discount) {
+                $discount = $promo->max_discount;
+            }
+        } else {
+            // Fixed amount
+            $discount = $promo->discount_value;
+        }
+        
+        // Ensure discount doesn't exceed total
+        if ($discount > $total) {
+            $discount = $total;
+        }
+        
+        wp_send_json_success(array(
+            'discount' => round($discount, 2),
+            'discount_amount' => round($discount, 2),
+            'new_total' => round($total - $discount, 2),
+            'message' => __('Promo code applied successfully!', 'dream-ticket')
+        ));
+    }
+    
+    /**
+     * Save promo code
+     */
+    public function save_promo_code() {
+        check_ajax_referer('dots_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-ticket')));
+        }
+        
+        global $wpdb;
+        $table = $wpdb->prefix . 'dots_promo_codes';
+        
+        $promo_id = isset($_POST['promo_id']) ? intval($_POST['promo_id']) : 0;
+        $code = strtoupper(sanitize_text_field($_POST['code']));
+        $discount_type = sanitize_text_field($_POST['discount_type']);
+        $discount_value = floatval($_POST['discount_value']);
+        $min_amount = floatval($_POST['min_amount']);
+        $max_discount = floatval($_POST['max_discount']);
+        $usage_limit = intval($_POST['usage_limit']);
+        $start_date = !empty($_POST['start_date']) ? sanitize_text_field($_POST['start_date']) : null;
+        $end_date = !empty($_POST['end_date']) ? sanitize_text_field($_POST['end_date']) : null;
+        $status = sanitize_text_field($_POST['status']);
+        
+        $data = array(
+            'code' => $code,
+            'discount_type' => $discount_type,
+            'discount_value' => $discount_value,
+            'min_amount' => $min_amount,
+            'max_discount' => $max_discount,
+            'usage_limit' => $usage_limit,
+            'start_date' => $start_date,
+            'end_date' => $end_date,
+            'status' => $status
+        );
+        
+        if ($promo_id > 0) {
+            $wpdb->update($table, $data, array('id' => $promo_id));
+        } else {
+            $wpdb->insert($table, $data);
+            $promo_id = $wpdb->insert_id;
+        }
+        
+        if ($wpdb->last_error) {
+            wp_send_json_error(array('message' => __('Failed to save promo code: ', 'dream-ticket') . $wpdb->last_error));
+        }
+        
+        wp_send_json_success(array('promo_id' => $promo_id, 'message' => __('Promo code saved successfully.', 'dream-ticket')));
+    }
+    
+    /**
+     * Delete promo code
+     */
+    public function delete_promo_code() {
+        check_ajax_referer('dots_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-ticket')));
+        }
+        
+        global $wpdb;
+        $promo_id = intval($_POST['promo_id']);
+        $wpdb->delete($wpdb->prefix . 'dots_promo_codes', array('id' => $promo_id));
+        
+        wp_send_json_success(array('message' => __('Promo code deleted successfully.', 'dream-ticket')));
     }
     
     /**
@@ -427,10 +696,21 @@ class DOTS_Ajax {
     /**
      * Generate QR code
      */
-    private function generate_qr_code($data) {
-        // Simple QR code generation using a service or library
-        // For now, return a placeholder URL
-        return 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' . urlencode($data);
+    private function generate_qr_code($order_number) {
+        // Generate QR code that links to ticket verification page
+        // Use absolute URL to ensure it works from anywhere
+        $ticket_url = home_url('/dream-tickets/ticket/' . urlencode($order_number));
+        
+        // Ensure rewrite rules are flushed
+        flush_rewrite_rules(false);
+        
+        // Generate QR code using multiple methods for reliability
+        // Method 1: QR Server API (most reliable)
+        $qr_url = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=2&data=' . urlencode($ticket_url);
+        
+        // Store both the QR image URL and the ticket URL for reference
+        // The QR code image URL is what we'll display
+        return $qr_url;
     }
     
     /**
