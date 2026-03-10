@@ -1,27 +1,50 @@
 # Dream Online Ticket Selling
 
+Author URI: https://profiles.wordpress.org/dreamscarnival/ 
+Plugin URI: https://wordpress.org/plugins/dream-online-ticket-selling/
+Author: Dream Carnival
+Contributors: dreamscarnival
+Tags: online ticket selling, Ticket, Compitition, Dream, ticket selling
+Tested up to: 6.9
+Stable tag: 1.0.0
+Requires PHP: 7.4
+Requires at least:** 6.3
+License: GPLv2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+
 A comprehensive WordPress plugin for selling event tickets online with full admin control and customer management.
+
 
 ## Features
 
 ### Admin Panel Features
 
-- **Dashboard**: Overview of total sales, upcoming events, and recent ticket purchases
+- **Dashboard**: Overview of total sales, upcoming events, and recent ticket purchases with shortcode display
 - **Event Management**: Create, edit, duplicate, and publish/unpublish events
-- **Ticket Categories**: Multiple ticket types with different prices and availability
+  - Add Event Type (Concert, Conference, Workshop, etc.)
+  - Set ticket price and available stock directly
+  - View Event ID for shortcode usage
+  - Display price and stock in events list
+- **Promo Codes**: Create and manage discount codes
+  - Percentage or fixed amount discounts
+  - Set usage limits and validity dates
+  - Track usage statistics
 - **Custom Form Fields**: Drag-and-drop form builder with various field types
+  - Auto-generates default fields (name, email, phone, address)
 - **Customer Management**: View all customers, search, filter, and export data
-- **Sales Reports**: Track revenue, tickets sold, and payment statuses
-- **Settings**: Configure currency, timezone, email notifications, and security
+- **Sales Reports**: Track revenue, tickets sold, payment statuses, and Event Type
+- **Settings**: Configure currency (with auto-updating symbol), timezone, email notifications, and payment gateways
 
 ### Frontend Features
 
 - **Event Listings**: Display upcoming events with filters
 - **Single Event Page**: Detailed event information with ticket purchase form
-- **Dynamic Ticket Forms**: Forms generated based on admin-defined fields
-- **Real-time Price Calculation**: Automatic price updates based on selections
+- **Dynamic Ticket Forms**: Forms generated based on admin-defined fields (auto-generates: name, email, phone, address)
+- **Real-time Price Calculation**: Automatic price updates based on quantity and promo codes
 - **Order Confirmation**: QR code generation for event check-in
-- **Promo Code Support**: Apply discount codes during purchase
+- **Promo Code Support**: Apply discount codes (percentage or fixed amount) during purchase
+- **QR Code Tickets**: Scan QR codes to view ticket details or download PDF
+- **Event Type Categorization**: Organize events by type (Concert, Conference, Workshop, etc.)
 
 ## Installation
 
@@ -71,18 +94,19 @@ Events are also accessible via:
 
 The plugin creates the following database tables:
 
-- `wp_dots_events` - Event information
-- `wp_dots_ticket_categories` - Ticket types and pricing
+- `wp_dots_events` - Event information (with event_type, ticket_price, tickets_available)
+- `wp_dots_ticket_categories` - Ticket types and pricing (legacy, optional)
 - `wp_dots_custom_fields` - Custom form fields
 - `wp_dots_customers` - Customer information
+- `wp_dots_promo_codes` - Promo codes and discounts
 - `wp_dots_sales` - Purchase records
 
 ## Settings
 
 ### General Settings
 
-- **Currency**: Select from USD, EUR, GBP, BDT
-- **Currency Symbol**: Customize the currency symbol
+- **Currency**: Select from USD, EUR, GBP, BDT, INR, AUD, CAD, JPY, CNY, SGD, AED, SAR
+- **Currency Symbol**: Auto-updates based on currency selection, can be customized
 - **Timezone**: Set your timezone
 - **Max Tickets per Customer**: Limit ticket purchases
 
@@ -97,13 +121,28 @@ The plugin creates the following database tables:
 
 ## Payment Integration
 
-Payment gateway integration is prepared for PayPal and Stripe. Full implementation requires:
+The plugin supports multiple payment gateways:
 
-1. Payment gateway API credentials
-2. SDK installation
-3. Configuration in settings
+### PayPal
+- Integration via PayPal API
+- Requires Client ID and Secret
+- Configure in **Settings > Payment**
 
-Currently, the plugin processes test payments. Update the `DOTS_Payment` class to integrate with your preferred payment gateway.
+### Stripe
+- Credit/Debit card payments via Stripe.js
+- Requires Publishable Key and Secret Key
+- Configure in **Settings > Payment**
+
+### SSLCommerz
+- Popular payment gateway for Bangladesh and South Asia
+- Requires Store ID and Store Password
+- Supports both Sandbox and Live modes
+- Test via **Dream Tickets > Test SSLCommerz**
+
+### Bank Transfer
+- Manual payment processing
+- Orders marked as "Pending" until manual confirmation
+- Tickets not deducted until payment confirmed
 
 ## Customization
 
@@ -162,11 +201,18 @@ For issues and questions:
 
 ### Version 1.0.0
 - Initial release
-- Event management
-- Ticket form builder
+- Event management with Event Type categorization
+- Direct ticket price and stock management (no categories needed)
+- Ticket form builder with auto-generated fields
 - Customer management
-- Sales tracking
+- Sales tracking with Event Type display
 - Order confirmation with QR codes
+- QR code scanning to view ticket details/PDF
+- Promo code management system
+- Multiple payment gateway support (PayPal, Stripe, SSLCommerz, Bank Transfer)
+- Auto-updating currency symbols
+- Shortcode management in dashboard
+- Event ID display for easy shortcode usage
 
 ## License
 
@@ -174,5 +220,20 @@ GPL v2 or later
 
 ## Author
 
-Your Name
+**Dream Carnival**
+
+Plugin developed by Dream Carnival. For support and updates, visit the plugin page.
+
+## Translation
+
+The plugin uses the text domain `dream-online-ticket-selling` for translations. Translation files should be placed in:
+
+```
+/wp-content/plugins/dream-online-ticket-selling/languages/
+```
+
+To create translations:
+1. Use tools like Poedit to generate `.po` and `.mo` files
+2. Name files as: `dream-online-ticket-selling-{locale}.po` (e.g., `dream-online-ticket-selling-es_ES.po` for Spanish)
+3. Place both `.po` and `.mo` files in the `languages` directory
 

@@ -3,8 +3,11 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
+// Template variables are intentionally non-prefixed for readability
 $settings = get_option('dots_settings', array());
 $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_symbol'] : '$';
+// phpcs:enable
 ?>
 
 <!DOCTYPE html>
@@ -30,17 +33,17 @@ $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_sym
                 <div class="dots-event-info">
                     <div class="dots-info-item">
                         <span class="dashicons dashicons-calendar-alt"></span>
-                        <strong><?php _e('Date:', 'dream-ticket'); ?></strong>
-                        <?php echo date_i18n(get_option('date_format'), strtotime($event->event_date)); ?>
+                        <strong><?php esc_html_e('Date:', 'dream-online-ticket-selling'); ?></strong>
+                        <?php echo esc_html(date_i18n(get_option('date_format'), strtotime($event->event_date))); ?>
                     </div>
                     <div class="dots-info-item">
                         <span class="dashicons dashicons-clock"></span>
-                        <strong><?php _e('Time:', 'dream-ticket'); ?></strong>
-                        <?php echo date_i18n(get_option('time_format'), strtotime($event->event_time)); ?>
+                        <strong><?php esc_html_e('Time:', 'dream-online-ticket-selling'); ?></strong>
+                        <?php echo esc_html(date_i18n(get_option('time_format'), strtotime($event->event_time))); ?>
                     </div>
                     <div class="dots-info-item">
                         <span class="dashicons dashicons-location"></span>
-                        <strong><?php _e('Location:', 'dream-ticket'); ?></strong>
+                        <strong><?php esc_html_e('Location:', 'dream-online-ticket-selling'); ?></strong>
                         <?php echo esc_html($event->location); ?>
                     </div>
                 </div>
@@ -54,7 +57,7 @@ $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_sym
             
             <div class="dots-event-sidebar">
                 <div class="dots-ticket-form-wrapper">
-                    <h2><?php _e('Purchase Tickets', 'dream-ticket'); ?></h2>
+                    <h2><?php esc_html_e('Purchase Tickets', 'dream-online-ticket-selling'); ?></h2>
                     <?php include DOTS_PLUGIN_DIR . 'frontend/views/ticket-form.php'; ?>
                 </div>
             </div>

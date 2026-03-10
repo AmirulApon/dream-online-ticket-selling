@@ -37,20 +37,26 @@ class DOTS_Database {
         ) $charset_collate;";
         
         // Add ticket_price column if it doesn't exist
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe
         $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_events LIKE 'ticket_price'");
         if (empty($column_exists)) {
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Table name from $wpdb->prefix is safe, schema update during activation
             $wpdb->query("ALTER TABLE $table_events ADD COLUMN ticket_price decimal(10,2) DEFAULT 0 AFTER location");
         }
         
         // Add tickets_available column if it doesn't exist
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe
         $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_events LIKE 'tickets_available'");
         if (empty($column_exists)) {
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Table name from $wpdb->prefix is safe, schema update during activation
             $wpdb->query("ALTER TABLE $table_events ADD COLUMN tickets_available int(11) DEFAULT 0 AFTER max_tickets");
         }
         
         // Add event_type column if it doesn't exist
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe
         $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_events LIKE 'event_type'");
         if (empty($column_exists)) {
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Table name from $wpdb->prefix is safe, schema update during activation
             $wpdb->query("ALTER TABLE $table_events ADD COLUMN event_type varchar(100) DEFAULT NULL AFTER name");
         }
         
@@ -179,6 +185,7 @@ class DOTS_Database {
         }
         
         $sql = "SELECT * FROM $table $where ORDER BY $orderby $limit";
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is a safe table name from $wpdb->prefix, $where and $limit are already prepared
         return $wpdb->get_results($sql);
     }
     
@@ -187,7 +194,9 @@ class DOTS_Database {
      */
     public static function get_event($id) {
         global $wpdb;
+        $id = absint($id);
         $table = $wpdb->prefix . 'dots_events';
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe, $id is sanitized with absint()
         return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", $id));
     }
     
@@ -196,7 +205,9 @@ class DOTS_Database {
      */
     public static function get_ticket_categories($event_id) {
         global $wpdb;
+        $event_id = absint($event_id);
         $table = $wpdb->prefix . 'dots_ticket_categories';
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe, $event_id is sanitized with absint()
         return $wpdb->get_results($wpdb->prepare("SELECT * FROM $table WHERE event_id = %d ORDER BY id ASC", $event_id));
     }
     
@@ -206,6 +217,7 @@ class DOTS_Database {
     public static function get_custom_fields() {
         global $wpdb;
         $table = $wpdb->prefix . 'dots_custom_fields';
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe
         return $wpdb->get_results("SELECT * FROM $table ORDER BY field_order ASC");
     }
     
@@ -214,10 +226,12 @@ class DOTS_Database {
      */
     public static function get_promo_code($code) {
         global $wpdb;
+        $code = sanitize_text_field(strtoupper($code));
         $table = $wpdb->prefix . 'dots_promo_codes';
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe, $code is sanitized
         return $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM $table WHERE code = %s AND status = 'active'",
-            strtoupper($code)
+            $code
         ));
     }
     
@@ -227,6 +241,7 @@ class DOTS_Database {
     public static function get_promo_codes() {
         global $wpdb;
         $table = $wpdb->prefix . 'dots_promo_codes';
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe
         return $wpdb->get_results("SELECT * FROM $table ORDER BY created_at DESC");
     }
     
@@ -235,7 +250,9 @@ class DOTS_Database {
      */
     public static function increment_promo_usage($code_id) {
         global $wpdb;
+        $code_id = absint($code_id);
         $table = $wpdb->prefix . 'dots_promo_codes';
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe, $code_id is sanitized with absint()
         $wpdb->query($wpdb->prepare(
             "UPDATE $table SET used_count = used_count + 1 WHERE id = %d",
             $code_id
@@ -250,12 +267,13 @@ class DOTS_Database {
         $table = $wpdb->prefix . 'dots_custom_fields';
         
         // Check if default fields already exist
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe
         $existing_fields = $wpdb->get_col("SELECT field_name FROM $table WHERE field_name IN ('name', 'email', 'phone', 'address')");
         
         $default_fields = array(
             array(
                 'field_name' => 'name',
-                'field_label' => __('Full Name', 'dream-ticket'),
+                'field_label' => __('Full Name', 'dream-online-ticket-selling'),
                 'field_type' => 'text',
                 'field_options' => '',
                 'is_required' => 1,
@@ -263,7 +281,7 @@ class DOTS_Database {
             ),
             array(
                 'field_name' => 'email',
-                'field_label' => __('Email Address', 'dream-ticket'),
+                'field_label' => __('Email Address', 'dream-online-ticket-selling'),
                 'field_type' => 'email',
                 'field_options' => '',
                 'is_required' => 1,
@@ -271,7 +289,7 @@ class DOTS_Database {
             ),
             array(
                 'field_name' => 'phone',
-                'field_label' => __('Mobile Number', 'dream-ticket'),
+                'field_label' => __('Mobile Number', 'dream-online-ticket-selling'),
                 'field_type' => 'tel',
                 'field_options' => '',
                 'is_required' => 1,
@@ -279,7 +297,7 @@ class DOTS_Database {
             ),
             array(
                 'field_name' => 'address',
-                'field_label' => __('Address', 'dream-ticket'),
+                'field_label' => __('Address', 'dream-online-ticket-selling'),
                 'field_type' => 'textarea',
                 'field_options' => '',
                 'is_required' => 0,
@@ -344,6 +362,7 @@ class DOTS_Database {
                 WHERE $where_clause
                 ORDER BY $orderby $limit";
         
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table names are safe from $wpdb->prefix, $where_clause and $limit are already prepared
         return $wpdb->get_results($sql);
     }
 }

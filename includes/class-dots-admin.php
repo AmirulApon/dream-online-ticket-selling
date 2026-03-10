@@ -20,8 +20,8 @@ class DOTS_Admin {
      */
     public function add_admin_menu() {
         add_menu_page(
-            __('Dream Tickets', 'dream-ticket'),
-            __('Dream Tickets', 'dream-ticket'),
+            __('Dream Tickets', 'dream-online-ticket-selling'),
+            __('Dream Tickets', 'dream-online-ticket-selling'),
             'manage_options',
             'dream-tickets',
             array($this, 'dashboard_page'),
@@ -31,8 +31,8 @@ class DOTS_Admin {
         
         add_submenu_page(
             'dream-tickets',
-            __('Dashboard', 'dream-ticket'),
-            __('Dashboard', 'dream-ticket'),
+            __('Dashboard', 'dream-online-ticket-selling'),
+            __('Dashboard', 'dream-online-ticket-selling'),
             'manage_options',
             'dream-tickets',
             array($this, 'dashboard_page')
@@ -40,8 +40,8 @@ class DOTS_Admin {
         
         add_submenu_page(
             'dream-tickets',
-            __('Events', 'dream-ticket'),
-            __('Events', 'dream-ticket'),
+            __('Events', 'dream-online-ticket-selling'),
+            __('Events', 'dream-online-ticket-selling'),
             'manage_options',
             'dream-tickets-events',
             array($this, 'events_page')
@@ -49,8 +49,8 @@ class DOTS_Admin {
         
         add_submenu_page(
             'dream-tickets',
-            __('Ticket Forms', 'dream-ticket'),
-            __('Ticket Forms', 'dream-ticket'),
+            __('Ticket Forms', 'dream-online-ticket-selling'),
+            __('Ticket Forms', 'dream-online-ticket-selling'),
             'manage_options',
             'dream-tickets-forms',
             array($this, 'forms_page')
@@ -58,8 +58,8 @@ class DOTS_Admin {
         
         add_submenu_page(
             'dream-tickets',
-            __('Customers', 'dream-ticket'),
-            __('Customers', 'dream-ticket'),
+            __('Customers', 'dream-online-ticket-selling'),
+            __('Customers', 'dream-online-ticket-selling'),
             'manage_options',
             'dream-tickets-customers',
             array($this, 'customers_page')
@@ -67,8 +67,8 @@ class DOTS_Admin {
         
         add_submenu_page(
             'dream-tickets',
-            __('Sales', 'dream-ticket'),
-            __('Sales', 'dream-ticket'),
+            __('Sales', 'dream-online-ticket-selling'),
+            __('Sales', 'dream-online-ticket-selling'),
             'manage_options',
             'dream-tickets-sales',
             array($this, 'sales_page')
@@ -76,8 +76,8 @@ class DOTS_Admin {
         
         add_submenu_page(
             'dream-tickets',
-            __('Promo Codes', 'dream-ticket'),
-            __('Promo Codes', 'dream-ticket'),
+            __('Promo Codes', 'dream-online-ticket-selling'),
+            __('Promo Codes', 'dream-online-ticket-selling'),
             'manage_options',
             'dream-tickets-promo-codes',
             array($this, 'promo_codes_page')
@@ -85,8 +85,8 @@ class DOTS_Admin {
         
         add_submenu_page(
             'dream-tickets',
-            __('Settings', 'dream-ticket'),
-            __('Settings', 'dream-ticket'),
+            __('Settings', 'dream-online-ticket-selling'),
+            __('Settings', 'dream-online-ticket-selling'),
             'manage_options',
             'dream-tickets-settings',
             array($this, 'settings_page')
@@ -94,8 +94,8 @@ class DOTS_Admin {
         
         add_submenu_page(
             'dream-tickets',
-            __('Test SSLCommerz', 'dream-ticket'),
-            __('Test SSLCommerz', 'dream-ticket'),
+            __('Test SSLCommerz', 'dream-online-ticket-selling'),
+            __('Test SSLCommerz', 'dream-online-ticket-selling'),
             'manage_options',
             'dream-tickets-test-sslcommerz',
             array($this, 'test_sslcommerz_page')
@@ -113,14 +113,23 @@ class DOTS_Admin {
         wp_enqueue_style('dots-admin-style', DOTS_PLUGIN_URL . 'assets/css/admin.css', array(), DOTS_VERSION);
         wp_enqueue_script('dots-admin-script', DOTS_PLUGIN_URL . 'assets/js/admin.js', array('jquery', 'jquery-ui-sortable'), DOTS_VERSION, true);
         
+        $settings = get_option('dots_settings', array());
+        $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_symbol'] : '$';
+        
         wp_localize_script('dots-admin-script', 'dotsAdmin', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('dots_admin_nonce'),
+            'currency_symbol' => $currency_symbol,
             'strings' => array(
-                'confirm_delete' => __('Are you sure you want to delete this?', 'dream-ticket'),
-                'saving' => __('Saving...', 'dream-ticket'),
-                'saved' => __('Saved!', 'dream-ticket'),
-                'error' => __('An error occurred.', 'dream-ticket'),
+                'confirm_delete' => __('Are you sure you want to delete this?', 'dream-online-ticket-selling'),
+                'saving' => __('Saving...', 'dream-online-ticket-selling'),
+                'saved' => __('Saved!', 'dream-online-ticket-selling'),
+                'error' => __('An error occurred.', 'dream-online-ticket-selling'),
+                'copied' => __('Copied!', 'dream-online-ticket-selling'),
+                'shortcode_copied' => __('Shortcode copied!', 'dream-online-ticket-selling'),
+                'confirm_delete_promo' => __('Are you sure you want to delete this promo code?', 'dream-online-ticket-selling'),
+                'discount_percentage_desc' => __('Enter percentage (e.g., 10 for 10% off).', 'dream-online-ticket-selling'),
+                'discount_fixed_desc' => __('Enter fixed amount to deduct from total.', 'dream-online-ticket-selling'),
             )
         ));
     }
@@ -129,7 +138,56 @@ class DOTS_Admin {
      * Register settings
      */
     public function register_settings() {
-        register_setting('dots_settings_group', 'dots_settings');
+        register_setting(
+            'dots_settings_group',
+            'dots_settings',
+            array(
+                'sanitize_callback' => array($this, 'sanitize_settings'),
+                'default' => array(),
+            )
+        );
+    }
+    
+    /**
+     * Sanitize settings
+     *
+     * @param array $input Raw settings input.
+     * @return array Sanitized settings.
+     */
+    public function sanitize_settings($input) {
+        $sanitized = array();
+        
+        if (is_array($input)) {
+            // Sanitize each setting field
+            $sanitized['currency'] = isset($input['currency']) ? sanitize_text_field($input['currency']) : 'USD';
+            $sanitized['currency_symbol'] = isset($input['currency_symbol']) ? sanitize_text_field($input['currency_symbol']) : '$';
+            $sanitized['timezone'] = isset($input['timezone']) ? sanitize_text_field($input['timezone']) : 'UTC';
+            $sanitized['max_tickets_per_customer'] = isset($input['max_tickets_per_customer']) ? absint($input['max_tickets_per_customer']) : 10;
+            $sanitized['enable_captcha'] = isset($input['enable_captcha']) ? 1 : 0;
+            $sanitized['email_notifications'] = isset($input['email_notifications']) ? 1 : 0;
+            $sanitized['admin_email'] = isset($input['admin_email']) ? sanitize_email($input['admin_email']) : get_option('admin_email');
+            
+            // Payment settings
+            $sanitized['paypal_enabled'] = isset($input['paypal_enabled']) ? 1 : 0;
+            $sanitized['paypal_mode'] = isset($input['paypal_mode']) ? sanitize_text_field($input['paypal_mode']) : 'sandbox';
+            $sanitized['paypal_client_id'] = isset($input['paypal_client_id']) ? sanitize_text_field($input['paypal_client_id']) : '';
+            $sanitized['paypal_secret'] = isset($input['paypal_secret']) ? sanitize_text_field($input['paypal_secret']) : '';
+            
+            $sanitized['stripe_enabled'] = isset($input['stripe_enabled']) ? 1 : 0;
+            $sanitized['stripe_mode'] = isset($input['stripe_mode']) ? sanitize_text_field($input['stripe_mode']) : 'test';
+            $sanitized['stripe_secret_key'] = isset($input['stripe_secret_key']) ? sanitize_text_field($input['stripe_secret_key']) : '';
+            $sanitized['stripe_publishable_key'] = isset($input['stripe_publishable_key']) ? sanitize_text_field($input['stripe_publishable_key']) : '';
+            
+            $sanitized['sslcommerz_enabled'] = isset($input['sslcommerz_enabled']) ? 1 : 0;
+            $sanitized['sslcommerz_mode'] = isset($input['sslcommerz_mode']) ? sanitize_text_field($input['sslcommerz_mode']) : 'sandbox';
+            $sanitized['sslcommerz_store_id'] = isset($input['sslcommerz_store_id']) ? sanitize_text_field($input['sslcommerz_store_id']) : '';
+            $sanitized['sslcommerz_store_password'] = isset($input['sslcommerz_store_password']) ? sanitize_text_field($input['sslcommerz_store_password']) : '';
+            
+            $sanitized['bank_transfer_enabled'] = isset($input['bank_transfer_enabled']) ? 1 : 0;
+            $sanitized['bank_transfer_details'] = isset($input['bank_transfer_details']) ? wp_kses_post($input['bank_transfer_details']) : '';
+        }
+        
+        return $sanitized;
     }
     
     /**
@@ -142,9 +200,13 @@ class DOTS_Admin {
         $table_sales = $wpdb->prefix . 'dots_sales';
         
         // Get statistics
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table names from $wpdb->prefix are safe
         $total_events = $wpdb->get_var("SELECT COUNT(*) FROM $table_events WHERE status = 'published'");
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table names from $wpdb->prefix are safe
         $total_sales = $wpdb->get_var("SELECT COUNT(*) FROM $table_sales WHERE payment_status = 'completed'");
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table names from $wpdb->prefix are safe
         $total_revenue = $wpdb->get_var("SELECT SUM(total_price) FROM $table_sales WHERE payment_status = 'completed'");
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table names from $wpdb->prefix are safe
         $upcoming_events = $wpdb->get_results("SELECT * FROM $table_events WHERE status = 'published' AND event_date >= CURDATE() ORDER BY event_date ASC LIMIT 5");
         $recent_sales = DOTS_Database::get_sales(array('limit' => 10));
         
@@ -155,9 +217,11 @@ class DOTS_Admin {
      * Events page
      */
     public function events_page() {
-        $action = isset($_GET['action']) ? sanitize_text_field($_GET['action']) : 'list';
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- GET parameter for page navigation
+        $action = isset($_GET['action']) ? sanitize_text_field(wp_unslash($_GET['action'])) : 'list';
         
         if ($action === 'edit' || $action === 'add') {
+            // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- GET parameter for page navigation
             $event_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
             $event = $event_id > 0 ? DOTS_Database::get_event($event_id) : null;
             include DOTS_PLUGIN_DIR . 'admin/views/event-edit.php';
@@ -192,17 +256,22 @@ class DOTS_Admin {
     public function sales_page() {
         // Handle QR code regeneration
         if (isset($_POST['regenerate_qr']) && check_admin_referer('dots_regenerate_qr')) {
-            $order_number = sanitize_text_field($_POST['order_number']);
+            $order_number = isset($_POST['order_number']) ? sanitize_text_field(wp_unslash($_POST['order_number'])) : '';
             global $wpdb;
+            // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe, $order_number is sanitized
             $sale = $wpdb->get_row($wpdb->prepare(
-                "SELECT * FROM {$wpdb->prefix}dots_sales WHERE order_number = %s",
+                "SELECT s.*, e.name as event_name, c.name as customer_name 
+                 FROM {$wpdb->prefix}dots_sales s 
+                 LEFT JOIN {$wpdb->prefix}dots_events e ON s.event_id = e.id 
+                 LEFT JOIN {$wpdb->prefix}dots_customers c ON s.customer_id = c.id 
+                 WHERE s.order_number = %s",
                 $order_number
             ));
             if ($sale) {
-                $ticket_url = home_url('/dream-tickets/ticket/' . urlencode($order_number));
-                $qr_url = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=2&data=' . urlencode($ticket_url);
+                // Encode just the order number for maximum scanner compatibility
+                $qr_url = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=2&data=' . rawurlencode($sale->order_number);
                 $wpdb->update($wpdb->prefix . 'dots_sales', array('qr_code' => $qr_url), array('id' => $sale->id));
-                echo '<div class="notice notice-success"><p>' . __('QR code regenerated successfully.', 'dream-ticket') . '</p></div>';
+                echo '<div class="notice notice-success"><p>' . esc_html__('QR code regenerated successfully.', 'dream-online-ticket-selling') . '</p></div>';
             }
         }
         
@@ -210,7 +279,7 @@ class DOTS_Admin {
         if (isset($_POST['flush_rewrite_rules']) && check_admin_referer('dots_flush_rewrite')) {
             flush_rewrite_rules(false);
             delete_option('dots_rewrite_rules_flushed');
-            echo '<div class="notice notice-success"><p>' . __('Rewrite rules flushed successfully.', 'dream-ticket') . '</p></div>';
+            echo '<div class="notice notice-success"><p>' . esc_html__('Rewrite rules flushed successfully.', 'dream-online-ticket-selling') . '</p></div>';
         }
         
         $sales = DOTS_Database::get_sales();
@@ -229,9 +298,11 @@ class DOTS_Admin {
      * Promo codes page
      */
     public function promo_codes_page() {
-        $action = isset($_GET['action']) ? sanitize_text_field($_GET['action']) : 'list';
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- GET parameter for page navigation
+        $action = isset($_GET['action']) ? sanitize_text_field(wp_unslash($_GET['action'])) : 'list';
         
         if ($action === 'edit' || $action === 'add') {
+            // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- GET parameter for page navigation
             $promo_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
             $promo = $promo_id > 0 ? $this->get_promo_code_by_id($promo_id) : null;
             include DOTS_PLUGIN_DIR . 'admin/views/promo-code-edit.php';
@@ -246,7 +317,9 @@ class DOTS_Admin {
      */
     private function get_promo_code_by_id($id) {
         global $wpdb;
+        $id = absint($id);
         $table = $wpdb->prefix . 'dots_promo_codes';
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe, $id is sanitized with absint()
         return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", $id));
     }
     
@@ -274,7 +347,7 @@ class DOTS_Admin {
      */
     private function test_sslcommerz_payment($amount, $store_id, $store_password, $mode) {
         if (empty($store_id) || empty($store_password)) {
-            return array('success' => false, 'message' => __('Please configure SSLCommerz credentials in Settings first.', 'dream-ticket'));
+            return array('success' => false, 'message' => __('Please configure SSLCommerz credentials in Settings first.', 'dream-online-ticket-selling'));
         }
         
         $api_url = $mode === 'live' 
@@ -322,24 +395,24 @@ class DOTS_Admin {
         ));
         
         if (is_wp_error($response)) {
-            return array('success' => false, 'message' => __('Connection Error: ', 'dream-ticket') . $response->get_error_message());
+            return array('success' => false, 'message' => __('Connection Error: ', 'dream-online-ticket-selling') . $response->get_error_message());
         }
         
         $response_code = wp_remote_retrieve_response_code($response);
         $response_body = wp_remote_retrieve_body($response);
         
-        parse_str($response_body, $response_data);
+        $response_json = json_decode($response_body, true);
         
-        if (isset($response_data['status']) && strtoupper($response_data['status']) === 'SUCCESS' && isset($response_data['GatewayPageURL'])) {
+        if (isset($response_json['status']) && strtoupper($response_json['status']) === 'SUCCESS' && isset($response_json['GatewayPageURL'])) {
             return array(
                 'success' => true,
-                'message' => __('Payment session created successfully!', 'dream-ticket'),
-                'redirect_url' => $response_data['GatewayPageURL'],
+                'message' => __('Payment session created successfully!', 'dream-online-ticket-selling'),
+                'redirect_url' => $response_json['GatewayPageURL'],
                 'tran_id' => $tran_id
             );
         } else {
-            $error = isset($response_data['failedreason']) ? $response_data['failedreason'] : __('Unknown error', 'dream-ticket');
-            return array('success' => false, 'message' => __('Error: ', 'dream-ticket') . $error, 'response' => $response_body);
+            $error = isset($response_json['failedreason']) && !empty($response_json['failedreason']) ? $response_json['failedreason'] : __('Unknown error', 'dream-online-ticket-selling');
+            return array('success' => false, 'message' => __('Error: ', 'dream-online-ticket-selling') . $error, 'response' => $response_body);
         }
     }
 }

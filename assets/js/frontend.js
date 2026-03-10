@@ -292,21 +292,91 @@ jQuery(document).ready(function($) {
     });
     
     // Handle Stripe payment
+    var stripe = null;
+    var cardElement = null;
+    
+    if (typeof Stripe !== 'undefined' && typeof dotsFrontend !== 'undefined' && dotsFrontend.stripe_publishable_key && $('#card-element').length) {
+        stripe = Stripe(dotsFrontend.stripe_publishable_key);
+        var elements = stripe.elements();
+        
+        var style = {
+            base: {
+                color: '#32325d',
+                fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                fontSmoothing: 'antialiased',
+                fontSize: '16px',
+                '::placeholder': {
+                    color: '#aab7c4'
+                }
+            },
+            invalid: {
+                color: '#fa755a',
+                iconColor: '#fa755a'
+            }
+        };
+
+        cardElement = elements.create('card', {style: style});
+        cardElement.mount('#card-element');
+
+        cardElement.on('change', function(event) {
+            var displayError = document.getElementById('card-errors');
+            if (event.error) {
+                displayError.textContent = event.error.message;
+            } else {
+                displayError.textContent = '';
+            }
+        });
+    }
+    
+    $('#payment_method').on('change', function() {
+        if ($(this).val() === 'stripe') {
+            $('#dots-stripe-element-container').slideDown();
+        } else {
+            $('#dots-stripe-element-container').slideUp();
+        }
+    });
+
     function handleStripePayment(clientSecret, paymentIntentId, orderNumber) {
-        // Note: This requires Stripe.js to be loaded
-        // For now, we'll show a message to complete payment
-        if (typeof Stripe !== 'undefined') {
-            var stripe = Stripe(dotsFrontend.stripe_publishable_key);
-            stripe.confirmCardPayment(clientSecret).then(function(result) {
+        if (stripe && cardElement) {
+            stripe.confirmCardPayment(clientSecret, {
+                payment_method: {
+                    card: cardElement
+                }
+            }).then(function(result) {
                 if (result.error) {
-                    alert('Payment failed: ' + result.error.message);
+                    $('.dots-form-message').removeClass('success').addClass('error').text('Payment failed: ' + result.error.message).show();
+                    $('.dots-submit-button').prop('disabled', false).text('Purchase Tickets');
                 } else {
-                    // Payment succeeded
-                    window.location.href = dotsFrontend.ajax_url + '?action=dots_verify_payment&payment_id=' + paymentIntentId + '&payment_method=stripe&order_number=' + orderNumber + '&nonce=' + dotsFrontend.nonce;
+                    // Payment succeeded, verify with backend via POST
+                    $.ajax({
+                        url: dotsFrontend.ajax_url,
+                        type: 'POST',
+                        data: {
+                            action: 'dots_verify_payment',
+                            nonce: dotsFrontend.nonce,
+                            payment_id: paymentIntentId,
+                            payment_method: 'stripe',
+                            order_number: orderNumber
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                window.location.href = response.data.redirect_url;
+                            } else {
+                                $('.dots-form-message').removeClass('success').addClass('error').text('Payment verification failed. Please contact support.').show();
+                                $('.dots-submit-button').prop('disabled', false).text('Purchase Tickets');
+                            }
+                        },
+                        error: function() {
+                            $('.dots-form-message').removeClass('success').addClass('error').text('Network error during verification.').show();
+                            $('.dots-submit-button').prop('disabled', false).text('Purchase Tickets');
+                        }
+                    });
                 }
             });
         } else {
-            alert('Stripe.js is not loaded. Please contact the site administrator.');
+            alert('Stripe.js is not loaded properly. Please contact the site administrator.');
+            $('.dots-submit-button').prop('disabled', false).text('Purchase Tickets');
+            $('.dots-form-message').hide();
         }
     }
     

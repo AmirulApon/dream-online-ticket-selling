@@ -1,14 +1,14 @@
 <?php
 /**
  * Plugin Name: Dream Online Ticket Selling
- * Plugin URI: https://example.com/dream-online-ticket-selling
+ * Plugin URI: https://wordpress.org/plugins/dream-online-ticket-selling/
  * Description: Enable users to sell event tickets online through a WordPress site with comprehensive admin controls and customer management.
  * Version: 1.0.0
- * Author: Your Name
- * Author URI: https://example.com
+ * Author URI: https://profiles.wordpress.org/dreamscarnival/ 
+ * Author: Dream Carnival
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: dream-ticket
+ * Text Domain: dream-online-ticket-selling
  * Domain Path: /languages
  */
 
@@ -88,7 +88,7 @@ class Dream_Online_Ticket_Selling {
     
     public function init() {
         // Load text domain for translations
-        load_plugin_textdomain('dream-ticket', false, dirname(DOTS_PLUGIN_BASENAME) . '/languages');
+        load_plugin_textdomain('dream-online-ticket-selling', false, dirname(DOTS_PLUGIN_BASENAME) . '/languages');
         
         // Initialize admin
         if (is_admin()) {

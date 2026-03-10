@@ -34,6 +34,12 @@ class DOTS_Frontend {
      */
     public function enqueue_scripts() {
         wp_enqueue_style('dots-frontend-style', DOTS_PLUGIN_URL . 'assets/css/frontend.css', array(), DOTS_VERSION);
+        
+        // Enqueue ticket-display.css only on the ticket display page
+        if (get_query_var('dots_ticket_number')) {
+            wp_enqueue_style('dots-ticket-display-style', DOTS_PLUGIN_URL . 'assets/css/ticket-display.css', array(), DOTS_VERSION);
+        }
+        
         wp_enqueue_script('dots-frontend-script', DOTS_PLUGIN_URL . 'assets/js/frontend.js', array('jquery'), DOTS_VERSION, true);
         
         $settings = get_option('dots_settings', array());
@@ -58,7 +64,7 @@ class DOTS_Frontend {
         
         // Load Stripe.js if Stripe is enabled
         if (isset($settings['stripe_enabled']) && $settings['stripe_enabled'] && !empty($stripe_publishable_key)) {
-            wp_enqueue_script('stripe-js', 'https://js.stripe.com/v3/', array(), null, true);
+            wp_enqueue_script('stripe-js', 'https://js.stripe.com/v3/', array(), '3.0', true);
         }
     }
     
@@ -96,7 +102,8 @@ class DOTS_Frontend {
         $ticket_number = get_query_var('dots_ticket_number');
         
         // Handle PDF download
-        if (isset($_GET['download']) && $_GET['download'] === 'pdf' && $ticket_number) {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- GET parameter for PDF download
+        if (isset($_GET['download']) && sanitize_text_field(wp_unslash($_GET['download'])) === 'pdf' && $ticket_number) {
             $this->generate_ticket_pdf($ticket_number);
             exit;
         }
@@ -107,6 +114,26 @@ class DOTS_Frontend {
         }
         
         if ($order_number) {
+            // Check for PayPal return
+            // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            if (isset($_GET['payment']) && sanitize_text_field(wp_unslash($_GET['payment'])) === 'success' && isset($_GET['token'])) {
+                // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+                $token = sanitize_text_field(wp_unslash($_GET['token']));
+                
+                // Call PayPal capture
+                $payment = new DOTS_Payment();
+                $capture_result = $payment->capture_paypal_order($order_number, $token);
+                
+                // Redirect to clean URL
+                if ($capture_result && isset($capture_result['status']) && $capture_result['status'] === 'success') {
+                    wp_safe_redirect(remove_query_arg(array('payment', 'token', 'PayerID')));
+                    exit;
+                } else {
+                    wp_safe_redirect(add_query_arg('payment', 'failed', remove_query_arg(array('token', 'PayerID'))));
+                    exit;
+                }
+            }
+            
             $this->display_order_confirmation($order_number);
             exit;
         }
@@ -160,16 +187,17 @@ class DOTS_Frontend {
         
         $event_id = intval($atts['event_id']);
         if (!$event_id) {
-            return '<p style="color: red;">' . __('Event ID is required. Use: [dream_ticket_form event_id="1"]', 'dream-ticket') . '</p>';
+            return '<p style="color: red;">' . __('Event ID is required. Use: [dream_ticket_form event_id="1"]', 'dream-online-ticket-selling') . '</p>';
         }
         
         $event = DOTS_Database::get_event($event_id);
         if (!$event) {
-            return '<p style="color: red;">' . sprintf(__('Event with ID %d not found.', 'dream-ticket'), $event_id) . '</p>';
+            /* translators: %d: event ID */
+            return '<p style="color: red;">' . sprintf(esc_html__('Event with ID %d not found.', 'dream-online-ticket-selling'), $event_id) . '</p>';
         }
         
         if ($event->status !== 'published') {
-            return '<p style="color: orange;">' . __('This event is not published yet.', 'dream-ticket') . '</p>';
+            return '<p style="color: orange;">' . __('This event is not published yet.', 'dream-online-ticket-selling') . '</p>';
         }
         
         // Store event data for localization
@@ -205,7 +233,7 @@ class DOTS_Frontend {
     private function display_event_page($event_id) {
         $event = DOTS_Database::get_event($event_id);
         if (!$event || $event->status !== 'published') {
-            wp_die(__('Event not found.', 'dream-ticket'));
+            wp_die(esc_html__('Event not found.', 'dream-online-ticket-selling'));
         }
         
         $categories = DOTS_Database::get_ticket_categories($event_id);
@@ -224,29 +252,32 @@ class DOTS_Frontend {
      */
     private function display_order_confirmation($order_number) {
         global $wpdb;
+        $order_number = sanitize_text_field($order_number);
         $table_sales = $wpdb->prefix . 'dots_sales';
         
+        // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe, $order_number is sanitized
         $sale = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM $table_sales WHERE order_number = %s",
             $order_number
         ));
         
         if (!$sale) {
-            wp_die(__('Order not found.', 'dream-ticket'));
+            wp_die(esc_html__('Order not found.', 'dream-online-ticket-selling'));
         }
         
         $event = DOTS_Database::get_event($sale->event_id);
         if (!$event) {
-            wp_die(__('Event not found.', 'dream-ticket'));
+            wp_die(esc_html__('Event not found.', 'dream-online-ticket-selling'));
         }
         
+        // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe, $sale->customer_id is sanitized
         $customer = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$wpdb->prefix}dots_customers WHERE id = %d",
             $sale->customer_id
         ));
         
         if (!$customer) {
-            wp_die(__('Customer not found.', 'dream-ticket'));
+            wp_die(esc_html__('Customer not found.', 'dream-online-ticket-selling'));
         }
         
         // Make variables available to view
@@ -265,8 +296,10 @@ class DOTS_Frontend {
         $table_sales = $wpdb->prefix . 'dots_sales';
         
         // Decode order number in case it's URL encoded
-        $order_number = urldecode($order_number);
+        $order_number_raw = urldecode($order_number);
+        $order_number = sanitize_text_field($order_number_raw);
         
+        // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe, $order_number is sanitized
         $sale = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM $table_sales WHERE order_number = %s",
             $order_number
@@ -274,28 +307,31 @@ class DOTS_Frontend {
         
         if (!$sale) {
             // Try without URL decoding
+            $order_number_alt = sanitize_text_field($order_number);
+            // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe, $order_number_alt is sanitized
             $sale = $wpdb->get_row($wpdb->prepare(
                 "SELECT * FROM $table_sales WHERE order_number = %s",
-                sanitize_text_field($order_number)
+                $order_number_alt
             ));
         }
         
         if (!$sale) {
-            wp_die(__('Ticket not found. Order Number: ', 'dream-ticket') . esc_html($order_number));
+            wp_die(esc_html__('Ticket not found. Order Number: ', 'dream-online-ticket-selling') . esc_html($order_number));
         }
         
         $event = DOTS_Database::get_event($sale->event_id);
         if (!$event) {
-            wp_die(__('Event not found.', 'dream-ticket'));
+            wp_die(esc_html__('Event not found.', 'dream-online-ticket-selling'));
         }
         
+        // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe, $sale->customer_id is sanitized
         $customer = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$wpdb->prefix}dots_customers WHERE id = %d",
             $sale->customer_id
         ));
         
         if (!$customer) {
-            wp_die(__('Customer not found.', 'dream-ticket'));
+            wp_die(esc_html__('Customer not found.', 'dream-online-ticket-selling'));
         }
         
         // Make variables available to view
@@ -312,18 +348,21 @@ class DOTS_Frontend {
      */
     private function generate_ticket_pdf($order_number) {
         global $wpdb;
+        $order_number = sanitize_text_field($order_number);
         $table_sales = $wpdb->prefix . 'dots_sales';
         
+        // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe, $order_number is sanitized
         $sale = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM $table_sales WHERE order_number = %s",
             $order_number
         ));
         
         if (!$sale) {
-            wp_die(__('Ticket not found.', 'dream-ticket'));
+            wp_die(esc_html__('Ticket not found.', 'dream-online-ticket-selling'));
         }
         
         $event = DOTS_Database::get_event($sale->event_id);
+        // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe, $sale->customer_id is sanitized
         $customer = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$wpdb->prefix}dots_customers WHERE id = %d",
             $sale->customer_id
@@ -340,6 +379,7 @@ class DOTS_Frontend {
         // Use browser print to PDF (simple solution)
         // For production, consider using a library like TCPDF or mPDF
         header('Content-Type: text/html; charset=utf-8');
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML output is intentional for PDF generation
         echo $html;
         echo '<script>window.onload = function() { window.print(); }</script>';
         exit;

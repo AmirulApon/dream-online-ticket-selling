@@ -205,9 +205,19 @@ jQuery(document).ready(function($) {
     });
     
     // Settings Tabs
+    var activeTab = localStorage.getItem('dots_active_tab');
+    if (activeTab && $(activeTab).length) {
+        $('.nav-tab').removeClass('nav-tab-active');
+        $('a[href="' + activeTab + '"]').addClass('nav-tab-active');
+        $('.dots-tab-content').hide();
+        $(activeTab).show();
+    }
+
     $('.nav-tab').on('click', function(e) {
         e.preventDefault();
         var target = $(this).attr('href');
+        localStorage.setItem('dots_active_tab', target);
+        
         $('.nav-tab').removeClass('nav-tab-active');
         $(this).addClass('nav-tab-active');
         $('.dots-tab-content').hide();
@@ -265,6 +275,150 @@ jQuery(document).ready(function($) {
         });
         
         file_frame.open();
+    });
+    
+    // Copy Shortcode in Dashboard
+    $('.dots-copy-shortcode').on('click', function(e) {
+        e.preventDefault();
+        var shortcode = $(this).data('shortcode');
+        var $temp = $('<textarea>');
+        $('body').append($temp);
+        $temp.val(shortcode).select();
+        document.execCommand('copy');
+        $temp.remove();
+        
+        // Show feedback
+        var $btn = $(this);
+        var originalText = $btn.html();
+        $btn.html('<span class="dashicons dashicons-yes-alt" style="vertical-align: middle; color: #00a32a;"></span> ' + dotsAdmin.strings.copied);
+        setTimeout(function() {
+            $btn.html(originalText);
+        }, 2000);
+    });
+
+    // Copy Shortcode in Events List
+    $('.dots-copy-event-id').on('click', function(e) {
+        e.preventDefault();
+        var eventId = $(this).data('event-id');
+        var shortcode = '[dream_ticket_form event_id="' + eventId + '"]';
+        
+        // Copy to clipboard
+        var $temp = $('<textarea>');
+        $('body').append($temp);
+        $temp.val(shortcode).select();
+        document.execCommand('copy');
+        $temp.remove();
+        
+        // Show feedback
+        var $btn = $(this);
+        var originalHtml = $btn.html();
+        $btn.html('<span class="dashicons dashicons-yes-alt" style="font-size: 14px; width: 14px; height: 14px; color: #00a32a;"></span>');
+        $btn.css('color', '#00a32a');
+        
+        // Show tooltip
+        var $tooltip = $('<div style="position: absolute; background: #1d2327; color: #fff; padding: 8px 12px; border-radius: 4px; font-size: 12px; z-index: 10000; margin-top: 30px; white-space: nowrap;">' + dotsAdmin.strings.shortcode_copied + '</div>');
+        $btn.after($tooltip);
+        
+        setTimeout(function() {
+            $btn.html(originalHtml);
+            $btn.css('color', '');
+            $tooltip.fadeOut(300, function() {
+                $(this).remove();
+            });
+        }, 2000);
+    });
+
+    // Copy Event ID in Event Edit
+    $('.dots-copy-event-id-edit').on('click', function(e) {
+        e.preventDefault();
+        var eventId = $(this).data('event-id');
+        var shortcode = '[dream_ticket_form event_id="' + eventId + '"]';
+        
+        // Copy to clipboard
+        var $temp = $('<textarea>');
+        $('body').append($temp);
+        $temp.val(shortcode).select();
+        document.execCommand('copy');
+        $temp.remove();
+        
+        // Show feedback
+        var $btn = $(this);
+        var originalText = $btn.html();
+        $btn.html('<span class="dashicons dashicons-yes-alt" style="vertical-align: middle; color: #00a32a;"></span> ' + dotsAdmin.strings.copied);
+        $btn.css('color', '#00a32a');
+        
+        setTimeout(function() {
+            $btn.html(originalText);
+            $btn.css('color', '');
+        }, 2000);
+    });
+
+    // Delete Promo Code
+    $('.dots-delete-promo').on('click', function(e) {
+        e.preventDefault();
+        if (!confirm(dotsAdmin.strings.confirm_delete_promo)) {
+            return;
+        }
+        
+        var promoId = $(this).data('promo-id');
+        $.ajax({
+            url: dotsAdmin.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'dots_delete_promo_code',
+                nonce: dotsAdmin.nonce,
+                promo_id: promoId
+            },
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    alert(response.data.message || dotsAdmin.strings.error);
+                }
+            }
+        });
+    });
+
+    // Auto-uppercase promo code
+    $('#promo_code').on('input', function() {
+        $(this).val($(this).val().toUpperCase());
+    });
+    
+    // Update discount value label when type changes
+    $('#discount_type').on('change', function() {
+        var type = $(this).val();
+        var $label = $('#discount_type_label');
+        var $description = $('#discount_description');
+        
+        if (type === 'percentage') {
+            $label.text('%');
+            $description.text(dotsAdmin.strings.discount_percentage_desc);
+        } else {
+            $label.text(dotsAdmin.currency_symbol);
+            $description.text(dotsAdmin.strings.discount_fixed_desc);
+        }
+    });
+    
+    // Save promo code
+    $('#dots-promo-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        var formData = $(this).serialize();
+        formData += '&action=dots_save_promo_code&nonce=' + dotsAdmin.nonce;
+        
+        $.ajax({
+            url: dotsAdmin.ajax_url,
+            type: 'POST',
+            data: formData,
+            success: function(response) {
+                if (response.success) {
+                    alert(dotsAdmin.strings.saved);
+                    window.location.href = 'admin.php?page=dream-tickets-promo-codes';
+                } else {
+                    alert(response.data.message || dotsAdmin.strings.error);
+                }
+            }
+        });
     });
 });
 

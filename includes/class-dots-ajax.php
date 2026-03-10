@@ -36,7 +36,7 @@ class DOTS_Ajax {
         check_ajax_referer('dots_admin_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-online-ticket-selling')));
         }
         
         global $wpdb;
@@ -44,17 +44,17 @@ class DOTS_Ajax {
         $table_categories = $wpdb->prefix . 'dots_ticket_categories';
         
         $event_id = isset($_POST['event_id']) ? intval($_POST['event_id']) : 0;
-        $name = sanitize_text_field($_POST['name']);
-        $event_type = isset($_POST['event_type']) ? sanitize_text_field($_POST['event_type']) : '';
-        $description = wp_kses_post($_POST['description']);
-        $event_date = sanitize_text_field($_POST['event_date']);
-        $event_time = sanitize_text_field($_POST['event_time']);
-        $location = sanitize_text_field($_POST['location']);
-        $banner_url = esc_url_raw($_POST['banner_url']);
+        $name = isset($_POST['name']) ? sanitize_text_field(wp_unslash($_POST['name'])) : '';
+        $event_type = isset($_POST['event_type']) ? sanitize_text_field(wp_unslash($_POST['event_type'])) : '';
+        $description = isset($_POST['description']) ? wp_kses_post(wp_unslash($_POST['description'])) : '';
+        $event_date = isset($_POST['event_date']) ? sanitize_text_field(wp_unslash($_POST['event_date'])) : '';
+        $event_time = isset($_POST['event_time']) ? sanitize_text_field(wp_unslash($_POST['event_time'])) : '';
+        $location = isset($_POST['location']) ? sanitize_text_field(wp_unslash($_POST['location'])) : '';
+        $banner_url = isset($_POST['banner_url']) ? esc_url_raw(wp_unslash($_POST['banner_url'])) : '';
         $ticket_price = isset($_POST['ticket_price']) ? floatval($_POST['ticket_price']) : 0;
         $tickets_available = isset($_POST['tickets_available']) ? intval($_POST['tickets_available']) : 0;
         $max_tickets = isset($_POST['max_tickets']) ? intval($_POST['max_tickets']) : 10;
-        $status = sanitize_text_field($_POST['status']);
+        $status = isset($_POST['status']) ? sanitize_text_field(wp_unslash($_POST['status'])) : 'draft';
         
         $data = array(
             'name' => $name,
@@ -77,7 +77,7 @@ class DOTS_Ajax {
             $event_id = $wpdb->insert_id;
         }
         
-        wp_send_json_success(array('event_id' => $event_id, 'message' => __('Event saved successfully.', 'dream-ticket')));
+        wp_send_json_success(array('event_id' => $event_id, 'message' => __('Event saved successfully.', 'dream-online-ticket-selling')));
     }
     
     /**
@@ -87,16 +87,20 @@ class DOTS_Ajax {
         check_ajax_referer('dots_admin_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-online-ticket-selling')));
         }
         
         global $wpdb;
-        $event_id = intval($_POST['event_id']);
+        $event_id = isset($_POST['event_id']) ? intval($_POST['event_id']) : 0;
+        
+        if (!$event_id) {
+            wp_send_json_error(array('message' => __('Invalid event ID.', 'dream-online-ticket-selling')));
+        }
         
         $wpdb->delete($wpdb->prefix . 'dots_events', array('id' => $event_id));
         $wpdb->delete($wpdb->prefix . 'dots_ticket_categories', array('event_id' => $event_id));
         
-        wp_send_json_success(array('message' => __('Event deleted successfully.', 'dream-ticket')));
+        wp_send_json_success(array('message' => __('Event deleted successfully.', 'dream-online-ticket-selling')));
     }
     
     /**
@@ -106,15 +110,20 @@ class DOTS_Ajax {
         check_ajax_referer('dots_admin_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-online-ticket-selling')));
         }
         
         global $wpdb;
-        $event_id = intval($_POST['event_id']);
+        $event_id = isset($_POST['event_id']) ? intval($_POST['event_id']) : 0;
+        
+        if (!$event_id) {
+            wp_send_json_error(array('message' => __('Invalid event ID.', 'dream-online-ticket-selling')));
+        }
+        
         $event = DOTS_Database::get_event($event_id);
         
         if (!$event) {
-            wp_send_json_error(array('message' => __('Event not found.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Event not found.', 'dream-online-ticket-selling')));
         }
         
         $table_events = $wpdb->prefix . 'dots_events';
@@ -147,7 +156,7 @@ class DOTS_Ajax {
             ));
         }
         
-        wp_send_json_success(array('event_id' => $new_event_id, 'message' => __('Event duplicated successfully.', 'dream-ticket')));
+        wp_send_json_success(array('event_id' => $new_event_id, 'message' => __('Event duplicated successfully.', 'dream-online-ticket-selling')));
     }
     
     /**
@@ -157,16 +166,16 @@ class DOTS_Ajax {
         check_ajax_referer('dots_admin_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-online-ticket-selling')));
         }
         
         global $wpdb;
-        $event_id = intval($_POST['event_id']);
-        $status = sanitize_text_field($_POST['status']);
+        $event_id = isset($_POST['event_id']) ? intval($_POST['event_id']) : 0;
+        $status = isset($_POST['status']) ? sanitize_text_field(wp_unslash($_POST['status'])) : 'draft';
         
         $wpdb->update($wpdb->prefix . 'dots_events', array('status' => $status), array('id' => $event_id));
         
-        wp_send_json_success(array('message' => __('Status updated.', 'dream-ticket')));
+        wp_send_json_success(array('message' => __('Status updated.', 'dream-online-ticket-selling')));
     }
     
     /**
@@ -176,17 +185,17 @@ class DOTS_Ajax {
         check_ajax_referer('dots_admin_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-online-ticket-selling')));
         }
         
         global $wpdb;
         $table = $wpdb->prefix . 'dots_custom_fields';
         
         $field_id = isset($_POST['field_id']) ? intval($_POST['field_id']) : 0;
-        $field_name = sanitize_key($_POST['field_name']);
-        $field_label = sanitize_text_field($_POST['field_label']);
-        $field_type = sanitize_text_field($_POST['field_type']);
-        $field_options = isset($_POST['field_options']) ? sanitize_textarea_field($_POST['field_options']) : '';
+        $field_name = isset($_POST['field_name']) ? sanitize_key(wp_unslash($_POST['field_name'])) : '';
+        $field_label = isset($_POST['field_label']) ? sanitize_text_field(wp_unslash($_POST['field_label'])) : '';
+        $field_type = isset($_POST['field_type']) ? sanitize_text_field(wp_unslash($_POST['field_type'])) : 'text';
+        $field_options = isset($_POST['field_options']) ? sanitize_textarea_field(wp_unslash($_POST['field_options'])) : '';
         $is_required = isset($_POST['is_required']) ? 1 : 0;
         $field_order = isset($_POST['field_order']) ? intval($_POST['field_order']) : 0;
         
@@ -206,7 +215,7 @@ class DOTS_Ajax {
             $field_id = $wpdb->insert_id;
         }
         
-        wp_send_json_success(array('field_id' => $field_id, 'message' => __('Field saved successfully.', 'dream-ticket')));
+        wp_send_json_success(array('field_id' => $field_id, 'message' => __('Field saved successfully.', 'dream-online-ticket-selling')));
     }
     
     /**
@@ -216,14 +225,19 @@ class DOTS_Ajax {
         check_ajax_referer('dots_admin_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-online-ticket-selling')));
         }
         
         global $wpdb;
-        $field_id = intval($_POST['field_id']);
+        $field_id = isset($_POST['field_id']) ? intval($_POST['field_id']) : 0;
+        
+        if (!$field_id) {
+            wp_send_json_error(array('message' => __('Invalid field ID.', 'dream-online-ticket-selling')));
+        }
+        
         $wpdb->delete($wpdb->prefix . 'dots_custom_fields', array('id' => $field_id));
         
-        wp_send_json_success(array('message' => __('Field deleted successfully.', 'dream-ticket')));
+        wp_send_json_success(array('message' => __('Field deleted successfully.', 'dream-online-ticket-selling')));
     }
     
     /**
@@ -233,18 +247,24 @@ class DOTS_Ajax {
         check_ajax_referer('dots_admin_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-online-ticket-selling')));
         }
         
         global $wpdb;
         $table = $wpdb->prefix . 'dots_custom_fields';
-        $orders = $_POST['orders'];
+        $orders = isset($_POST['orders']) && is_array($_POST['orders']) ? wp_unslash($_POST['orders']) : array();
         
+        // Sanitize orders array
+        $sanitized_orders = array();
         foreach ($orders as $order => $field_id) {
-            $wpdb->update($table, array('field_order' => intval($order)), array('id' => intval($field_id)));
+            $sanitized_orders[absint($order)] = absint($field_id);
         }
         
-        wp_send_json_success(array('message' => __('Order updated.', 'dream-ticket')));
+        foreach ($sanitized_orders as $order => $field_id) {
+            $wpdb->update($table, array('field_order' => $order), array('id' => $field_id));
+        }
+        
+        wp_send_json_success(array('message' => __('Order updated.', 'dream-online-ticket-selling')));
     }
     
     /**
@@ -255,28 +275,36 @@ class DOTS_Ajax {
         
         global $wpdb;
         
-        $event_id = intval($_POST['event_id']);
-        $quantity = intval($_POST['quantity']);
+        $event_id = isset($_POST['event_id']) ? intval($_POST['event_id']) : 0;
+        $quantity = isset($_POST['quantity']) ? intval($_POST['quantity']) : 0;
         
         // Parse customer data (can be JSON string or array)
         $customer_data = array();
         if (isset($_POST['customer_data'])) {
-            if (is_string($_POST['customer_data'])) {
-                $customer_data = json_decode(stripslashes($_POST['customer_data']), true);
-                if (!is_array($customer_data)) {
-                    $customer_data = array();
+            // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Will be sanitized after JSON decode or array processing
+            $raw_customer_data = wp_unslash($_POST['customer_data']);
+            if (is_string($raw_customer_data)) {
+                $decoded_data = json_decode($raw_customer_data, true);
+                if (is_array($decoded_data)) {
+                    // Sanitize each field in customer data
+                    foreach ($decoded_data as $key => $value) {
+                        $customer_data[sanitize_key($key)] = sanitize_text_field($value);
+                    }
                 }
-            } else {
-                $customer_data = $_POST['customer_data'];
+            } elseif (is_array($raw_customer_data)) {
+                // Sanitize each field in customer data array
+                foreach ($raw_customer_data as $key => $value) {
+                    $customer_data[sanitize_key($key)] = sanitize_text_field($value);
+                }
             }
         }
         
-        $promo_code = isset($_POST['promo_code']) ? sanitize_text_field($_POST['promo_code']) : '';
+        $promo_code = isset($_POST['promo_code']) ? sanitize_text_field(wp_unslash($_POST['promo_code'])) : '';
         
         // Validate event
         $event = DOTS_Database::get_event($event_id);
         if (!$event || $event->status !== 'published') {
-            wp_send_json_error(array('message' => __('Event not available.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Event not available.', 'dream-online-ticket-selling')));
         }
         
         // Get ticket price and availability from event
@@ -285,17 +313,18 @@ class DOTS_Ajax {
         $max_tickets_per_customer = isset($event->max_tickets) ? intval($event->max_tickets) : 10;
         
         if ($ticket_price <= 0) {
-            wp_send_json_error(array('message' => __('Ticket price not set for this event.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Ticket price not set for this event.', 'dream-online-ticket-selling')));
         }
         
         // Check availability
         if ($tickets_available < $quantity) {
-            wp_send_json_error(array('message' => __('Not enough tickets available.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Not enough tickets available.', 'dream-online-ticket-selling')));
         }
         
         // Check max per customer
         if ($quantity > $max_tickets_per_customer) {
-            wp_send_json_error(array('message' => sprintf(__('Maximum %d tickets per customer.', 'dream-ticket'), $max_tickets_per_customer)));
+            // translators: %d is the maximum number of tickets allowed per customer
+            wp_send_json_error(array('message' => sprintf(__('Maximum %d tickets per customer.', 'dream-online-ticket-selling'), $max_tickets_per_customer)));
         }
         
         // Calculate price
@@ -309,7 +338,7 @@ class DOTS_Ajax {
             
             if ($promo && $promo->status === 'active') {
                 // Check date validity
-                $today = date('Y-m-d');
+                $today = gmdate('Y-m-d');
                 $valid_date = true;
                 if (!empty($promo->start_date) && $today < $promo->start_date) {
                     $valid_date = false;
@@ -359,11 +388,11 @@ class DOTS_Ajax {
         $customer_address = isset($customer_data['address']) ? sanitize_textarea_field($customer_data['address']) : '';
         
         if (empty($customer_email)) {
-            wp_send_json_error(array('message' => __('Email is required.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Email is required.', 'dream-online-ticket-selling')));
         }
         
         if (empty($customer_name)) {
-            wp_send_json_error(array('message' => __('Name is required.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Name is required.', 'dream-online-ticket-selling')));
         }
         
         $customer = $wpdb->get_row($wpdb->prepare(
@@ -394,7 +423,7 @@ class DOTS_Ajax {
         }
         
         // Generate order number
-        $order_number = 'DOTS-' . time() . '-' . rand(1000, 9999);
+        $order_number = 'DOTS-' . time() . '-' . wp_rand(1000, 9999);
         
         // Create sale record
         $sale_data = array(
@@ -414,17 +443,17 @@ class DOTS_Ajax {
         $insert_result = $wpdb->insert($wpdb->prefix . 'dots_sales', $sale_data);
         
         if ($insert_result === false) {
-            wp_send_json_error(array('message' => __('Failed to create order. Please try again.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Failed to create order. Please try again.', 'dream-online-ticket-selling')));
         }
         
         $sale_id = $wpdb->insert_id;
         
         // Generate QR code
-        $qr_code = $this->generate_qr_code($order_number);
+        $qr_code = $this->generate_qr_code($order_number, $event->name, $customer_name);
         $wpdb->update($wpdb->prefix . 'dots_sales', array('qr_code' => $qr_code), array('id' => $sale_id));
         
         // Get payment method
-        $payment_method = isset($_POST['payment_method']) ? sanitize_text_field($_POST['payment_method']) : 'bank_transfer';
+        $payment_method = isset($_POST['payment_method']) ? sanitize_text_field(wp_unslash($_POST['payment_method'])) : 'bank_transfer';
         
         $settings = get_option('dots_settings', array());
         $paypal_enabled = isset($settings['paypal_enabled']) && $settings['paypal_enabled'];
@@ -499,15 +528,15 @@ class DOTS_Ajax {
                 wp_send_json_success(array(
                     'order_number' => $order_number,
                     'redirect_url' => home_url('/dream-tickets/order/' . $order_number),
-                    'message' => __('Order created. Payment pending bank transfer.', 'dream-ticket')
+                    'message' => __('Order created. Payment pending bank transfer.', 'dream-online-ticket-selling')
                 ));
             } else {
                 // Fallback - should not reach here
-                wp_send_json_error(array('message' => __('Payment processing failed.', 'dream-ticket')));
+                wp_send_json_error(array('message' => __('Payment processing failed.', 'dream-online-ticket-selling')));
             }
         } else {
             // Payment processing failed
-            $error_message = isset($payment_result['message']) ? $payment_result['message'] : __('Payment processing failed.', 'dream-ticket');
+            $error_message = isset($payment_result['message']) ? $payment_result['message'] : __('Payment processing failed.', 'dream-online-ticket-selling');
             
             // Update sale with failed status
             $update_data['payment_status'] = 'failed';
@@ -523,44 +552,45 @@ class DOTS_Ajax {
     public function apply_promo() {
         check_ajax_referer('dots_frontend_nonce', 'nonce');
         
-        $promo_code = strtoupper(sanitize_text_field($_POST['promo_code']));
-        $total = floatval($_POST['total']);
+        $promo_code = isset($_POST['promo_code']) ? strtoupper(sanitize_text_field(wp_unslash($_POST['promo_code']))) : '';
+        $total = isset($_POST['total']) ? floatval($_POST['total']) : 0;
         
         if (empty($promo_code)) {
-            wp_send_json_error(array('message' => __('Please enter a promo code.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Please enter a promo code.', 'dream-online-ticket-selling')));
         }
         
         // Get promo code from database
         $promo = DOTS_Database::get_promo_code($promo_code);
         
         if (!$promo) {
-            wp_send_json_error(array('message' => __('Invalid promo code.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Invalid promo code.', 'dream-online-ticket-selling')));
         }
         
         // Check if promo code is active
         if ($promo->status !== 'active') {
-            wp_send_json_error(array('message' => __('This promo code is not active.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('This promo code is not active.', 'dream-online-ticket-selling')));
         }
         
         // Check date validity
-        $today = date('Y-m-d');
+        $today = gmdate('Y-m-d');
         if (!empty($promo->start_date) && $today < $promo->start_date) {
-            wp_send_json_error(array('message' => __('This promo code is not yet valid.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('This promo code is not yet valid.', 'dream-online-ticket-selling')));
         }
         if (!empty($promo->end_date) && $today > $promo->end_date) {
-            wp_send_json_error(array('message' => __('This promo code has expired.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('This promo code has expired.', 'dream-online-ticket-selling')));
         }
         
         // Check minimum amount
         if ($promo->min_amount > 0 && $total < $promo->min_amount) {
             $settings = get_option('dots_settings', array());
             $currency_symbol = isset($settings['currency_symbol']) ? $settings['currency_symbol'] : '$';
-            wp_send_json_error(array('message' => sprintf(__('Minimum purchase amount of %s%s required.', 'dream-ticket'), $currency_symbol, number_format($promo->min_amount, 2))));
+            // translators: %1$s is the currency symbol, %2$s is the minimum amount
+            wp_send_json_error(array('message' => sprintf(__('Minimum purchase amount of %1$s%2$s required.', 'dream-online-ticket-selling'), $currency_symbol, number_format($promo->min_amount, 2))));
         }
         
         // Check usage limit
         if ($promo->usage_limit > 0 && $promo->used_count >= $promo->usage_limit) {
-            wp_send_json_error(array('message' => __('This promo code has reached its usage limit.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('This promo code has reached its usage limit.', 'dream-online-ticket-selling')));
         }
         
         // Calculate discount
@@ -585,7 +615,7 @@ class DOTS_Ajax {
             'discount' => round($discount, 2),
             'discount_amount' => round($discount, 2),
             'new_total' => round($total - $discount, 2),
-            'message' => __('Promo code applied successfully!', 'dream-ticket')
+            'message' => __('Promo code applied successfully!', 'dream-online-ticket-selling')
         ));
     }
     
@@ -596,22 +626,22 @@ class DOTS_Ajax {
         check_ajax_referer('dots_admin_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-online-ticket-selling')));
         }
         
         global $wpdb;
         $table = $wpdb->prefix . 'dots_promo_codes';
         
         $promo_id = isset($_POST['promo_id']) ? intval($_POST['promo_id']) : 0;
-        $code = strtoupper(sanitize_text_field($_POST['code']));
-        $discount_type = sanitize_text_field($_POST['discount_type']);
-        $discount_value = floatval($_POST['discount_value']);
-        $min_amount = floatval($_POST['min_amount']);
-        $max_discount = floatval($_POST['max_discount']);
-        $usage_limit = intval($_POST['usage_limit']);
-        $start_date = !empty($_POST['start_date']) ? sanitize_text_field($_POST['start_date']) : null;
-        $end_date = !empty($_POST['end_date']) ? sanitize_text_field($_POST['end_date']) : null;
-        $status = sanitize_text_field($_POST['status']);
+        $code = isset($_POST['code']) ? strtoupper(sanitize_text_field(wp_unslash($_POST['code']))) : '';
+        $discount_type = isset($_POST['discount_type']) ? sanitize_text_field(wp_unslash($_POST['discount_type'])) : 'percentage';
+        $discount_value = isset($_POST['discount_value']) ? floatval($_POST['discount_value']) : 0;
+        $min_amount = isset($_POST['min_amount']) ? floatval($_POST['min_amount']) : 0;
+        $max_discount = isset($_POST['max_discount']) ? floatval($_POST['max_discount']) : 0;
+        $usage_limit = isset($_POST['usage_limit']) ? intval($_POST['usage_limit']) : 0;
+        $start_date = !empty($_POST['start_date']) ? sanitize_text_field(wp_unslash($_POST['start_date'])) : null;
+        $end_date = !empty($_POST['end_date']) ? sanitize_text_field(wp_unslash($_POST['end_date'])) : null;
+        $status = isset($_POST['status']) ? sanitize_text_field(wp_unslash($_POST['status'])) : 'active';
         
         $data = array(
             'code' => $code,
@@ -633,10 +663,10 @@ class DOTS_Ajax {
         }
         
         if ($wpdb->last_error) {
-            wp_send_json_error(array('message' => __('Failed to save promo code: ', 'dream-ticket') . $wpdb->last_error));
+            wp_send_json_error(array('message' => __('Failed to save promo code: ', 'dream-online-ticket-selling') . $wpdb->last_error));
         }
         
-        wp_send_json_success(array('promo_id' => $promo_id, 'message' => __('Promo code saved successfully.', 'dream-ticket')));
+        wp_send_json_success(array('promo_id' => $promo_id, 'message' => __('Promo code saved successfully.', 'dream-online-ticket-selling')));
     }
     
     /**
@@ -646,14 +676,19 @@ class DOTS_Ajax {
         check_ajax_referer('dots_admin_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Unauthorized.', 'dream-online-ticket-selling')));
         }
         
         global $wpdb;
-        $promo_id = intval($_POST['promo_id']);
+        $promo_id = isset($_POST['promo_id']) ? intval($_POST['promo_id']) : 0;
+        
+        if (!$promo_id) {
+            wp_send_json_error(array('message' => __('Invalid promo code ID.', 'dream-online-ticket-selling')));
+        }
+        
         $wpdb->delete($wpdb->prefix . 'dots_promo_codes', array('id' => $promo_id));
         
-        wp_send_json_success(array('message' => __('Promo code deleted successfully.', 'dream-ticket')));
+        wp_send_json_success(array('message' => __('Promo code deleted successfully.', 'dream-online-ticket-selling')));
     }
     
     /**
@@ -663,13 +698,13 @@ class DOTS_Ajax {
         check_ajax_referer('dots_admin_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
-            wp_die(__('Unauthorized.', 'dream-ticket'));
+            wp_die(esc_html__('Unauthorized.', 'dream-online-ticket-selling'));
         }
         
         $sales = DOTS_Database::get_sales();
         
         header('Content-Type: text/csv');
-        header('Content-Disposition: attachment; filename="customers-' . date('Y-m-d') . '.csv"');
+        header('Content-Disposition: attachment; filename="customers-' . gmdate('Y-m-d') . '.csv"');
         
         $output = fopen('php://output', 'w');
         fputcsv($output, array('Order Number', 'Customer Name', 'Email', 'Phone', 'Event', 'Ticket Type', 'Quantity', 'Total Price', 'Purchase Date', 'Payment Status'));
@@ -689,6 +724,7 @@ class DOTS_Ajax {
             ));
         }
         
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- fclose() is acceptable for CSV export via php://output
         fclose($output);
         exit;
     }
@@ -696,17 +732,9 @@ class DOTS_Ajax {
     /**
      * Generate QR code
      */
-    private function generate_qr_code($order_number) {
-        // Generate QR code that links to ticket verification page
-        // Use absolute URL to ensure it works from anywhere
-        $ticket_url = home_url('/dream-tickets/ticket/' . urlencode($order_number));
-        
-        // Ensure rewrite rules are flushed
-        flush_rewrite_rules(false);
-        
-        // Generate QR code using multiple methods for reliability
-        // Method 1: QR Server API (most reliable)
-        $qr_url = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=2&data=' . urlencode($ticket_url);
+    private function generate_qr_code($order_number, $event_name = '', $customer_name = '') {
+        // Encode just the order number — most scanners reject multiline plain text
+        $qr_url = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=2&data=' . rawurlencode($order_number);
         
         // Store both the QR image URL and the ticket URL for reference
         // The QR code image URL is what we'll display
@@ -717,8 +745,9 @@ class DOTS_Ajax {
      * Send confirmation email
      */
     private function send_confirmation_email($email, $order_number) {
-        $subject = __('Your Ticket Purchase Confirmation', 'dream-ticket');
-        $message = sprintf(__('Thank you for your purchase. Your order number is: %s', 'dream-ticket'), $order_number);
+        $subject = __('Your Ticket Purchase Confirmation', 'dream-online-ticket-selling');
+        // translators: %s is the order number
+        $message = sprintf(__('Thank you for your purchase. Your order number is: %s', 'dream-online-ticket-selling'), $order_number);
         wp_mail($email, $subject, $message);
     }
 }

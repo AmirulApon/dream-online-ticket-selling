@@ -35,7 +35,7 @@ class DOTS_Payment {
             case 'bank_transfer':
                 return $this->process_bank_transfer($order_data);
             default:
-                return array('status' => 'error', 'message' => __('Invalid payment method.', 'dream-ticket'));
+                return array('status' => 'error', 'message' => __('Invalid payment method.', 'dream-online-ticket-selling'));
         }
     }
     
@@ -49,7 +49,7 @@ class DOTS_Payment {
         $paypal_mode = isset($settings['paypal_mode']) ? $settings['paypal_mode'] : 'sandbox';
         
         if (empty($paypal_client_id) || empty($paypal_secret)) {
-            return array('status' => 'error', 'message' => __('PayPal credentials not configured.', 'dream-ticket'));
+            return array('status' => 'error', 'message' => __('PayPal credentials not configured.', 'dream-online-ticket-selling'));
         }
         
         $api_url = $paypal_mode === 'live' 
@@ -79,7 +79,7 @@ class DOTS_Payment {
         $access_token = $this->get_paypal_access_token($api_url, $paypal_client_id, $paypal_secret);
         
         if (!$access_token) {
-            return array('status' => 'error', 'message' => __('Failed to authenticate with PayPal. Please check your credentials.', 'dream-ticket'));
+            return array('status' => 'error', 'message' => __('Failed to authenticate with PayPal. Please check your credentials.', 'dream-online-ticket-selling'));
         }
         
         // Create order
@@ -96,14 +96,14 @@ class DOTS_Payment {
         
         if (is_wp_error($response)) {
             error_log('PayPal Order Creation Error: ' . $response->get_error_message());
-            return array('status' => 'error', 'message' => __('Failed to connect to PayPal: ', 'dream-ticket') . $response->get_error_message());
+            return array('status' => 'error', 'message' => __('Failed to connect to PayPal: ', 'dream-online-ticket-selling') . $response->get_error_message());
         }
         
         $response_code = wp_remote_retrieve_response_code($response);
         $body = json_decode(wp_remote_retrieve_body($response), true);
         
         if ($response_code !== 201 && $response_code !== 200) {
-            $error_message = isset($body['message']) ? $body['message'] : __('Failed to create PayPal order.', 'dream-ticket');
+            $error_message = isset($body['message']) ? $body['message'] : __('Failed to create PayPal order.', 'dream-online-ticket-selling');
             if (isset($body['details'])) {
                 $error_details = array();
                 foreach ($body['details'] as $detail) {
@@ -130,7 +130,7 @@ class DOTS_Payment {
             
             if (empty($approve_url)) {
                 error_log('PayPal Order Created but no approve URL found. Response: ' . wp_remote_retrieve_body($response));
-                return array('status' => 'error', 'message' => __('PayPal order created but approval URL not found.', 'dream-ticket'));
+                return array('status' => 'error', 'message' => __('PayPal order created but approval URL not found.', 'dream-online-ticket-selling'));
             }
             
             return array(
@@ -142,7 +142,78 @@ class DOTS_Payment {
         }
         
         error_log('PayPal Order Creation - Invalid response: ' . wp_remote_retrieve_body($response));
-        return array('status' => 'error', 'message' => __('Invalid response from PayPal.', 'dream-ticket'));
+        return array('status' => 'error', 'message' => __('Invalid response from PayPal.', 'dream-online-ticket-selling'));
+    }
+    
+    /**
+     * Capture PayPal Order
+     */
+    public function capture_paypal_order($order_number, $token) {
+        $settings = get_option('dots_settings', array());
+        $paypal_client_id = isset($settings['paypal_client_id']) ? $settings['paypal_client_id'] : '';
+        $paypal_secret = isset($settings['paypal_secret']) ? $settings['paypal_secret'] : '';
+        $paypal_mode = isset($settings['paypal_mode']) ? $settings['paypal_mode'] : 'sandbox';
+        
+        if (empty($paypal_client_id) || empty($paypal_secret)) {
+            return array('status' => 'error', 'message' => __('PayPal credentials not configured.', 'dream-online-ticket-selling'));
+        }
+        
+        $api_url = $paypal_mode === 'live' 
+            ? 'https://api-m.paypal.com' 
+            : 'https://api-m.sandbox.paypal.com';
+            
+        $access_token = $this->get_paypal_access_token($api_url, $paypal_client_id, $paypal_secret);
+        
+        if (!$access_token) {
+            return array('status' => 'error', 'message' => __('Failed to authenticate with PayPal.', 'dream-online-ticket-selling'));
+        }
+        
+        // Capture order
+        $response = wp_remote_post($api_url . '/v2/checkout/orders/' . $token . '/capture', array(
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $access_token,
+                'Prefer' => 'return=representation'
+            ),
+            'timeout' => 30
+        ));
+        
+        if (is_wp_error($response)) {
+            error_log('PayPal Order Capture Error: ' . $response->get_error_message());
+            return array('status' => 'error', 'message' => __('Failed to capture PayPal order: ', 'dream-online-ticket-selling') . $response->get_error_message());
+        }
+        
+        $response_code = wp_remote_retrieve_response_code($response);
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        
+        if ($response_code === 201 || $response_code === 200) {
+            if (isset($body['status']) && $body['status'] === 'COMPLETED') {
+                // Update order in database to completed
+                global $wpdb;
+                $table_sales = $wpdb->prefix . 'dots_sales';
+                $transaction_id = isset($body['purchase_units'][0]['payments']['captures'][0]['id']) ? $body['purchase_units'][0]['payments']['captures'][0]['id'] : $token;
+                
+                $wpdb->update($table_sales, array(
+                    'payment_status' => 'completed',
+                    'transaction_id' => $transaction_id
+                ), array('order_number' => $order_number));
+                
+                // Update tickets available
+                // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
+                $sale = $wpdb->get_row($wpdb->prepare("SELECT quantity, event_id FROM $table_sales WHERE order_number = %s", $order_number));
+                if ($sale) {
+                    $wpdb->query($wpdb->prepare(
+                        "UPDATE {$wpdb->prefix}dots_events SET tickets_available = tickets_available - %d WHERE id = %d",
+                        $sale->quantity, $sale->event_id
+                    ));
+                }
+                
+                return array('status' => 'success');
+            }
+        }
+        
+        error_log('PayPal Capture Failed. Code: ' . $response_code . ', Response: ' . wp_remote_retrieve_body($response));
+        return array('status' => 'error');
     }
     
     /**
@@ -190,7 +261,7 @@ class DOTS_Payment {
         $stripe_mode = isset($settings['stripe_mode']) ? $settings['stripe_mode'] : 'test';
         
         if (empty($stripe_secret_key)) {
-            return array('status' => 'error', 'message' => __('Stripe credentials not configured.', 'dream-ticket'));
+            return array('status' => 'error', 'message' => __('Stripe credentials not configured.', 'dream-online-ticket-selling'));
         }
         
         // For Stripe, we'll create a payment intent using form-encoded data
@@ -221,7 +292,7 @@ class DOTS_Payment {
         $body = json_decode(wp_remote_retrieve_body($response), true);
         
         if ($response_code !== 200) {
-            $error_message = isset($body['error']['message']) ? $body['error']['message'] : __('Failed to create Stripe payment intent.', 'dream-ticket');
+            $error_message = isset($body['error']['message']) ? $body['error']['message'] : __('Failed to create Stripe payment intent.', 'dream-online-ticket-selling');
             error_log('Stripe API Error. Code: ' . $response_code . ', Response: ' . wp_remote_retrieve_body($response));
             return array('status' => 'error', 'message' => $error_message);
         }
@@ -235,7 +306,7 @@ class DOTS_Payment {
             );
         }
         
-        return array('status' => 'error', 'message' => __('Failed to create Stripe payment intent.', 'dream-ticket'));
+        return array('status' => 'error', 'message' => __('Failed to create Stripe payment intent.', 'dream-online-ticket-selling'));
     }
     
     /**
@@ -248,7 +319,7 @@ class DOTS_Payment {
         $mode = isset($settings['sslcommerz_mode']) ? $settings['sslcommerz_mode'] : 'sandbox';
         
         if (empty($store_id) || empty($store_password)) {
-            return array('status' => 'error', 'message' => __('SSLCommerz credentials not configured.', 'dream-ticket'));
+            return array('status' => 'error', 'message' => __('SSLCommerz credentials not configured.', 'dream-online-ticket-selling'));
         }
         
         // Determine API URL based on mode
@@ -348,7 +419,7 @@ class DOTS_Payment {
         if (is_wp_error($response)) {
             $error_message = $response->get_error_message();
             error_log('SSLCommerz Connection Error: ' . $error_message);
-            return array('status' => 'error', 'message' => __('Failed to connect to SSLCommerz: ', 'dream-ticket') . $error_message);
+            return array('status' => 'error', 'message' => __('Failed to connect to SSLCommerz: ', 'dream-online-ticket-selling') . $error_message);
         }
         
         $response_code = wp_remote_retrieve_response_code($response);
@@ -360,7 +431,7 @@ class DOTS_Payment {
         
         if ($response_code !== 200) {
             error_log('SSLCommerz API Error. Code: ' . $response_code . ', Response: ' . $response_body);
-            return array('status' => 'error', 'message' => __('SSLCommerz API returned error code: ', 'dream-ticket') . $response_code);
+            return array('status' => 'error', 'message' => __('SSLCommerz API returned error code: ', 'dream-online-ticket-selling') . $response_code);
         }
         
         // Parse response - SSLCommerz returns key-value pairs
@@ -379,22 +450,23 @@ class DOTS_Payment {
             );
         } else {
             // Get error message from response
-            $error_message = __('Failed to create payment session.', 'dream-ticket');
+            $error_message = __('Failed to create payment session.', 'dream-online-ticket-selling');
             
             // Check various possible error fields
             if (isset($response_data['failedreason']) && !empty($response_data['failedreason'])) {
-                $error_message = __('SSLCommerz Error: ', 'dream-ticket') . $response_data['failedreason'];
+                $error_message = __('SSLCommerz Error: ', 'dream-online-ticket-selling') . $response_data['failedreason'];
             } elseif (isset($response_data['error']) && !empty($response_data['error'])) {
-                $error_message = __('SSLCommerz Error: ', 'dream-ticket') . $response_data['error'];
+                $error_message = __('SSLCommerz Error: ', 'dream-online-ticket-selling') . $response_data['error'];
             } elseif (isset($response_data['errorDesc']) && !empty($response_data['errorDesc'])) {
-                $error_message = __('SSLCommerz Error: ', 'dream-ticket') . $response_data['errorDesc'];
+                $error_message = __('SSLCommerz Error: ', 'dream-online-ticket-selling') . $response_data['errorDesc'];
             } elseif (isset($response_data['status'])) {
                 $status = $response_data['status'];
-                $error_message = sprintf(__('Payment session creation failed. Status: %s', 'dream-ticket'), $status);
+                /* translators: %s: payment status */
+                $error_message = sprintf(__('Payment session creation failed. Status: %s', 'dream-online-ticket-selling'), $status);
                 
                 // Add more details if available
                 if (isset($response_data['APIConnect']) && $response_data['APIConnect'] === 'INVALID_REQUEST') {
-                    $error_message .= ' - ' . __('Invalid request parameters. Please check your SSLCommerz settings.', 'dream-ticket');
+                    $error_message .= ' - ' . __('Invalid request parameters. Please check your SSLCommerz settings.', 'dream-online-ticket-selling');
                 }
             }
             
@@ -402,7 +474,7 @@ class DOTS_Payment {
             if (strpos($response_body, 'error') !== false || strpos($response_body, 'failed') !== false) {
                 // Try to find error message in response
                 if (preg_match('/error[=:]\s*([^\n\r]+)/i', $response_body, $matches)) {
-                    $error_message = __('SSLCommerz Error: ', 'dream-ticket') . trim($matches[1]);
+                    $error_message = __('SSLCommerz Error: ', 'dream-online-ticket-selling') . trim($matches[1]);
                 }
             }
             
@@ -422,7 +494,7 @@ class DOTS_Payment {
         return array(
             'status' => 'success',
             'transaction_id' => 'bank-' . time(),
-            'message' => __('Payment pending. Please complete bank transfer.', 'dream-ticket')
+            'message' => __('Payment pending. Please complete bank transfer.', 'dream-online-ticket-selling')
         );
     }
     
@@ -433,12 +505,12 @@ class DOTS_Payment {
         check_ajax_referer('dots_frontend_nonce', 'nonce');
         
         $order_data = array(
-            'order_number' => sanitize_text_field($_POST['order_number']),
-            'event_id' => intval($_POST['event_id']),
-            'event_name' => sanitize_text_field($_POST['event_name']),
-            'total_price' => floatval($_POST['total_price']),
-            'payment_method' => sanitize_text_field($_POST['payment_method']),
-            'return_url' => esc_url_raw($_POST['return_url'])
+            'order_number' => isset($_POST['order_number']) ? sanitize_text_field(wp_unslash($_POST['order_number'])) : '',
+            'event_id' => isset($_POST['event_id']) ? intval($_POST['event_id']) : 0,
+            'event_name' => isset($_POST['event_name']) ? sanitize_text_field(wp_unslash($_POST['event_name'])) : '',
+            'total_price' => isset($_POST['total_price']) ? floatval($_POST['total_price']) : 0,
+            'payment_method' => isset($_POST['payment_method']) ? sanitize_text_field(wp_unslash($_POST['payment_method'])) : '',
+            'return_url' => isset($_POST['return_url']) ? esc_url_raw(wp_unslash($_POST['return_url'])) : ''
         );
         
         $result = $this->process_payment($order_data);
@@ -451,25 +523,26 @@ class DOTS_Payment {
     public function verify_payment() {
         check_ajax_referer('dots_frontend_nonce', 'nonce');
         
-        $payment_id = isset($_POST['payment_id']) ? sanitize_text_field($_POST['payment_id']) : '';
-        $payment_method = isset($_POST['payment_method']) ? sanitize_text_field($_POST['payment_method']) : '';
-        $order_number = isset($_POST['order_number']) ? sanitize_text_field($_POST['order_number']) : '';
+        $payment_id = isset($_POST['payment_id']) ? sanitize_text_field(wp_unslash($_POST['payment_id'])) : '';
+        $payment_method = isset($_POST['payment_method']) ? sanitize_text_field(wp_unslash($_POST['payment_method'])) : '';
+        $order_number = isset($_POST['order_number']) ? sanitize_text_field(wp_unslash($_POST['order_number'])) : '';
         
         if (empty($payment_id) || empty($payment_method) || empty($order_number)) {
-            wp_send_json_error(array('message' => __('Missing payment information.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Missing payment information.', 'dream-online-ticket-selling')));
         }
         
         global $wpdb;
         $table_sales = $wpdb->prefix . 'dots_sales';
         
         // Get the sale record
+        // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe, $order_number is sanitized
         $sale = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM $table_sales WHERE order_number = %s",
+            "SELECT * FROM $table_sales WHERE order_number = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table_sales is a safe table name from $wpdb->prefix
             $order_number
         ));
         
         if (!$sale) {
-            wp_send_json_error(array('message' => __('Order not found.', 'dream-ticket')));
+            wp_send_json_error(array('message' => __('Order not found.', 'dream-online-ticket-selling')));
         }
         
         if ($payment_method === 'paypal') {
@@ -479,7 +552,7 @@ class DOTS_Payment {
             $paypal_mode = isset($settings['paypal_mode']) ? $settings['paypal_mode'] : 'sandbox';
             
             if (empty($paypal_client_id) || empty($paypal_secret)) {
-                wp_send_json_error(array('message' => __('PayPal credentials not configured.', 'dream-ticket')));
+                wp_send_json_error(array('message' => __('PayPal credentials not configured.', 'dream-online-ticket-selling')));
             }
             
             $api_url = $paypal_mode === 'live' 
@@ -515,12 +588,13 @@ class DOTS_Payment {
                         ));
                         
                         wp_send_json_success(array(
-                            'message' => __('Payment verified successfully.', 'dream-ticket'),
+                            'message' => __('Payment verified successfully.', 'dream-online-ticket-selling'),
                             'redirect_url' => home_url('/dream-tickets/order/' . $order_number)
                         ));
                     } elseif (isset($body['status'])) {
                         // Payment is still pending or in another state
-                        wp_send_json_error(array('message' => sprintf(__('Payment status: %s', 'dream-ticket'), $body['status'])));
+                        /* translators: %s: payment status */
+                        wp_send_json_error(array('message' => sprintf(__('Payment status: %s', 'dream-online-ticket-selling'), $body['status'])));
                     }
                 }
             }
@@ -529,7 +603,7 @@ class DOTS_Payment {
             $stripe_secret_key = isset($settings['stripe_secret_key']) ? $settings['stripe_secret_key'] : '';
             
             if (empty($stripe_secret_key)) {
-                wp_send_json_error(array('message' => __('Stripe credentials not configured.', 'dream-ticket')));
+                wp_send_json_error(array('message' => __('Stripe credentials not configured.', 'dream-online-ticket-selling')));
             }
             
             // Verify Stripe payment intent
@@ -558,16 +632,17 @@ class DOTS_Payment {
                     ));
                     
                     wp_send_json_success(array(
-                        'message' => __('Payment verified successfully.', 'dream-ticket'),
+                        'message' => __('Payment verified successfully.', 'dream-online-ticket-selling'),
                         'redirect_url' => home_url('/dream-tickets/order/' . $order_number)
                     ));
                 } elseif (isset($body['status'])) {
-                    wp_send_json_error(array('message' => sprintf(__('Payment status: %s', 'dream-ticket'), $body['status'])));
+                    /* translators: %s: payment status */
+                    wp_send_json_error(array('message' => sprintf(__('Payment status: %s', 'dream-online-ticket-selling'), $body['status'])));
                 }
             }
         }
         
-        wp_send_json_error(array('message' => __('Payment verification failed.', 'dream-ticket')));
+        wp_send_json_error(array('message' => __('Payment verification failed.', 'dream-online-ticket-selling')));
     }
     
     /**
@@ -578,26 +653,31 @@ class DOTS_Payment {
         $table_sales = $wpdb->prefix . 'dots_sales';
         
         // Get order number from request
-        $order_number = isset($_GET['order_number']) ? sanitize_text_field($_GET['order_number']) : '';
-        $status = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Payment gateway callback, nonce not available
+        $order_number = isset($_GET['order_number']) ? sanitize_text_field(wp_unslash($_GET['order_number'])) : '';
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Payment gateway callback, nonce not available
+        $status = isset($_GET['status']) ? sanitize_text_field(wp_unslash($_GET['status'])) : '';
         
         // Also check POST data (SSLCommerz sends data via POST)
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Payment gateway callback, nonce not available
         if (empty($order_number) && isset($_POST['value_a'])) {
-            $order_number = sanitize_text_field($_POST['value_a']);
+            // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Payment gateway callback, nonce not available
+            $order_number = sanitize_text_field(wp_unslash($_POST['value_a']));
         }
         
         if (empty($order_number)) {
-            wp_die(__('Invalid request.', 'dream-ticket'));
+            wp_die(esc_html__('Invalid request.', 'dream-online-ticket-selling'));
         }
         
         // Get the sale record
+        // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name from $wpdb->prefix is safe, $order_number is sanitized
         $sale = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM $table_sales WHERE order_number = %s",
+            "SELECT * FROM $table_sales WHERE order_number = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table_sales is a safe table name from $wpdb->prefix
             $order_number
         ));
         
         if (!$sale) {
-            wp_die(__('Order not found.', 'dream-ticket'));
+            wp_die(esc_html__('Order not found.', 'dream-online-ticket-selling'));
         }
         
         $settings = get_option('dots_settings', array());
@@ -606,10 +686,14 @@ class DOTS_Payment {
         $mode = isset($settings['sslcommerz_mode']) ? $settings['sslcommerz_mode'] : 'sandbox';
         
         // Verify payment with SSLCommerz
-        $tran_id = isset($_POST['tran_id']) ? sanitize_text_field($_POST['tran_id']) : '';
-        $amount = isset($_POST['amount']) ? sanitize_text_field($_POST['amount']) : '';
-        $currency = isset($_POST['currency']) ? sanitize_text_field($_POST['currency']) : '';
-        $val_id = isset($_POST['val_id']) ? sanitize_text_field($_POST['val_id']) : '';
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Payment gateway callback, nonce not available
+        $tran_id = isset($_POST['tran_id']) ? sanitize_text_field(wp_unslash($_POST['tran_id'])) : '';
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Payment gateway callback, nonce not available
+        $amount = isset($_POST['amount']) ? sanitize_text_field(wp_unslash($_POST['amount'])) : '';
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Payment gateway callback, nonce not available
+        $currency = isset($_POST['currency']) ? sanitize_text_field(wp_unslash($_POST['currency'])) : '';
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Payment gateway callback, nonce not available
+        $val_id = isset($_POST['val_id']) ? sanitize_text_field(wp_unslash($_POST['val_id'])) : '';
         
         if (!empty($tran_id) && !empty($val_id)) {
             // Verify payment with SSLCommerz validation API
@@ -617,16 +701,15 @@ class DOTS_Payment {
                 ? 'https://securepay.sslcommerz.com' 
                 : 'https://sandbox.sslcommerz.com';
             
-            $verify_data = array(
+            $verify_url = add_query_arg(array(
+                'val_id' => $val_id,
                 'store_id' => $store_id,
                 'store_passwd' => $store_password,
-                'val_id' => $val_id,
+                'v' => 1,
                 'format' => 'json'
-            );
+            ), $api_url . '/validator/api/validationserverAPI.php');
             
-            $verify_response = wp_remote_post($api_url . '/validator/api/validationserverAPI.php', array(
-                'method' => 'POST',
-                'body' => $verify_data,
+            $verify_response = wp_remote_get($verify_url, array(
                 'timeout' => 30,
                 'sslverify' => true
             ));
@@ -649,7 +732,7 @@ class DOTS_Payment {
                     ));
                     
                     // Redirect to success page
-                    wp_redirect(home_url('/dream-tickets/order/' . $order_number));
+                    wp_safe_redirect(home_url('/dream-tickets/order/' . $order_number));
                     exit;
                 } else {
                     // Payment validation failed
@@ -659,7 +742,7 @@ class DOTS_Payment {
                         'transaction_id' => $val_id
                     ), array('order_number' => $order_number));
                     
-                    wp_redirect(home_url('/dream-tickets/order/' . $order_number . '?payment=failed'));
+                    wp_safe_redirect(home_url('/dream-tickets/order/' . $order_number . '?payment=failed'));
                     exit;
                 }
             }
@@ -669,7 +752,7 @@ class DOTS_Payment {
         if ($status === 'success' || $status === 'ipn') {
             // If validation data is not available, mark as processing
             if ($sale->payment_status === 'processing' || $sale->payment_status === 'pending') {
-                wp_redirect(home_url('/dream-tickets/order/' . $order_number));
+                wp_safe_redirect(home_url('/dream-tickets/order/' . $order_number));
                 exit;
             }
         } elseif ($status === 'failed' || $status === 'cancelled') {
@@ -678,12 +761,12 @@ class DOTS_Payment {
                 'payment_method' => 'sslcommerz'
             ), array('order_number' => $order_number));
             
-            wp_redirect(home_url('/dream-tickets/order/' . $order_number . '?payment=failed'));
+            wp_safe_redirect(home_url('/dream-tickets/order/' . $order_number . '?payment=failed'));
             exit;
         }
         
         // Default redirect
-        wp_redirect(home_url('/dream-tickets/order/' . $order_number));
+        wp_safe_redirect(home_url('/dream-tickets/order/' . $order_number));
         exit;
     }
 }
