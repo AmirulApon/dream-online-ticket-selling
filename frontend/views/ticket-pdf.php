@@ -1,11 +1,16 @@
+<?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+?>
 <!DOCTYPE html>
-<html>
+<html <?php language_attributes(); ?>>
 <head>
-    <meta charset="UTF-8">
+    <meta charset="<?php bloginfo('charset'); ?>">
     <title><?php esc_html_e('Ticket', 'dream-online-ticket-selling'); ?> - <?php echo esc_html($sale->order_number); ?></title>
-    <link rel="stylesheet" href="<?php echo esc_url(DOTS_PLUGIN_URL . 'assets/css/ticket-pdf.css'); ?>">
+    <?php wp_head(); ?>
 </head>
-<body>
+<body <?php body_class(); ?>>
     <div class="ticket">
         <div class="ticket-header">
             <h1><?php esc_html_e('Event Ticket', 'dream-online-ticket-selling'); ?></h1>
@@ -67,6 +72,7 @@
             <img src="<?php echo esc_url($qr_url); ?>" alt="QR Code">
         </div>
     </div>
+    <?php wp_footer(); ?>
 </body>
 </html>
 

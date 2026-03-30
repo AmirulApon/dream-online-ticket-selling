@@ -197,6 +197,26 @@ For issues and questions:
 - PHP 7.2 or higher
 - MySQL 5.6 or higher
 
+== External services ==
+
+This plugin relies on several third-party external services to provide its core functionalities (payment processing and QR code generation).
+
+1. **PayPal**
+It connects to the PayPal API (`api-m.paypal.com` / `api-m.sandbox.paypal.com`) to process online ticket transactions. When a user selects PayPal as the payment method, order details and amount are sent to PayPal.
+This service is provided by PayPal Inc: [Terms of Use](https://www.paypal.com/us/webapps/mpp/ua/legalhub-full), [Privacy Policy](https://www.paypal.com/us/webapps/mpp/ua/privacy-full).
+
+2. **Stripe**
+It loads Stripe.js (`https://js.stripe.com/v3/`) and connects to the Stripe API (`api.stripe.com`) to securely process credit and debit card payments. Order details are transmitted during checkout.
+This service is provided by Stripe Inc: [Terms of Service](https://stripe.com/legal/end-users), [Privacy Policy](https://stripe.com/privacy).
+
+3. **SSLCommerz**
+It connects to the SSLCommerz API (`securepay.sslcommerz.com` / `sandbox.sslcommerz.com`) to process payments primarily in South Asia. Order and basic customer details are sent to facilitate the transaction.
+This service is provided by SSLCommerz: [Terms and Conditions](https://sslcommerz.com/terms-conditions/), [Privacy Policy](https://sslcommerz.com/privacy-policy/).
+
+4. **QR Server**
+It uses the free API provided by goqr.me (`api.qrserver.com`) to dynamically generate QR codes for order confirmations and event check-ins. The generated QR code encodes the order number.
+This service is provided by Egoditor GmbH: [Terms of Service](https://goqr.me/api/doc/), [Privacy Policy](https://goqr.me/privacy-policy/).
+
 ## Changelog
 
 ### Version 1.0.0

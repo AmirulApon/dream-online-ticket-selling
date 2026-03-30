@@ -40,6 +40,13 @@ class DOTS_Frontend {
             wp_enqueue_style('dots-ticket-display-style', DOTS_PLUGIN_URL . 'assets/css/ticket-display.css', array(), DOTS_VERSION);
         }
         
+        // Enqueue ticket-pdf.css and print script only on the ticket PDF page
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        if (isset($_GET['download']) && sanitize_text_field(wp_unslash($_GET['download'])) === 'pdf' && get_query_var('dots_ticket_number')) {
+            wp_enqueue_style('dots-ticket-pdf-style', DOTS_PLUGIN_URL . 'assets/css/ticket-pdf.css', array(), DOTS_VERSION);
+            wp_add_inline_script('dots-frontend-script', 'window.onload = function() { window.print(); }');
+        }
+        
         wp_enqueue_script('dots-frontend-script', DOTS_PLUGIN_URL . 'assets/js/frontend.js', array('jquery'), DOTS_VERSION, true);
         
         $settings = get_option('dots_settings', array());
@@ -381,7 +388,6 @@ class DOTS_Frontend {
         header('Content-Type: text/html; charset=utf-8');
         // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML output is intentional for PDF generation
         echo $html;
-        echo '<script>window.onload = function() { window.print(); }</script>';
         exit;
     }
 }

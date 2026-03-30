@@ -87,8 +87,7 @@ class Dream_Online_Ticket_Selling {
     }
     
     public function init() {
-        // Load text domain for translations
-        load_plugin_textdomain('dream-online-ticket-selling', false, dirname(DOTS_PLUGIN_BASENAME) . '/languages');
+        // Translations are automatically loaded from WordPress.org
         
         // Initialize admin
         if (is_admin()) {
