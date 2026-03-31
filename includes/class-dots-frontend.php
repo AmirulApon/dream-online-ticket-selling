@@ -111,6 +111,7 @@ class DOTS_Frontend {
         // Handle PDF download
         // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- GET parameter for PDF download
         if (isset($_GET['download']) && sanitize_text_field(wp_unslash($_GET['download'])) === 'pdf' && $ticket_number) {
+            $this->verify_public_access($ticket_number, 'ticket');
             $this->generate_ticket_pdf($ticket_number);
             exit;
         }
@@ -124,6 +125,11 @@ class DOTS_Frontend {
             // Check for PayPal return
             // phpcs:ignore WordPress.Security.NonceVerification.Recommended
             if (isset($_GET['payment']) && sanitize_text_field(wp_unslash($_GET['payment'])) === 'success' && isset($_GET['token'])) {
+                // Verify nonce for security against CSRF capturing
+                if (!isset($_GET['_wpnonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['_wpnonce'])), 'verify_order_' . $order_number)) {
+                    wp_die(esc_html__('Security check failed. Invalid nonce.', 'dream-online-ticket-selling'));
+                }
+                
                 // phpcs:ignore WordPress.Security.NonceVerification.Recommended
                 $token = sanitize_text_field(wp_unslash($_GET['token']));
                 
@@ -141,12 +147,79 @@ class DOTS_Frontend {
                 }
             }
             
+            $this->verify_public_access($order_number, 'order');
             $this->display_order_confirmation($order_number);
             exit;
         }
         
         if ($ticket_number) {
+            $this->verify_public_access($ticket_number, 'ticket');
             $this->display_ticket($ticket_number);
+            exit;
+        }
+    }
+    
+    /**
+     * Secures public endpoints by requesting an email matching or a valid hash key
+     */
+    private function verify_public_access($number, $type = 'order') {
+        global $wpdb;
+        $table_sales = $wpdb->prefix . 'dots_sales';
+        
+        $number_clean = sanitize_text_field(urldecode($number));
+        // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
+        $sale = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_sales WHERE order_number = %s", $number_clean));
+        
+        if (!$sale && $type === 'ticket') {
+            // Find sale by ticket number
+            // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
+            $ticket = $wpdb->get_row($wpdb->prepare("SELECT sale_id FROM {$wpdb->prefix}dots_tickets WHERE ticket_number = %s", $number_clean));
+            if ($ticket) {
+                // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
+                $sale = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_sales WHERE id = %d", $ticket->sale_id));
+            }
+        }
+        
+        if (!$sale) {
+            wp_die(esc_html__('Transaction not found.', 'dream-online-ticket-selling'));
+        }
+        
+        $customer = DOTS_Database::get_customer($sale->customer_id);
+        if (!$customer) {
+            wp_die(esc_html__('Customer not found.', 'dream-online-ticket-selling'));
+        }
+        
+        $order_number = $sale->order_number;
+        $expected_hash = substr(md5($order_number . $customer->email . wp_salt()), 0, 10);
+        $cookie_name = 'dots_access_' . md5($order_number);
+        
+        $has_access = false;
+        
+        if (current_user_can('manage_options')) {
+            $has_access = true;
+        } elseif (isset($_GET['key']) && sanitize_text_field(wp_unslash($_GET['key'])) === $expected_hash) {
+            $has_access = true;
+            if (!headers_sent()) {
+                setcookie($cookie_name, md5($expected_hash . wp_salt()), time() + 3600 * 24 * 30, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+            }
+        } elseif (isset($_COOKIE[$cookie_name]) && sanitize_text_field(wp_unslash($_COOKIE[$cookie_name])) === md5($expected_hash . wp_salt())) {
+            $has_access = true;
+        } elseif (isset($_POST['verify_email']) && isset($_POST['order_nonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['order_nonce'])), 'verify_order_' . $order_number)) {
+            $submitted_email = sanitize_email(wp_unslash($_POST['verify_email']));
+            if ($submitted_email === $customer->email) {
+                if (!headers_sent()) {
+                    setcookie($cookie_name, md5($expected_hash . wp_salt()), time() + 3600 * 24 * 30, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+                }
+                wp_safe_redirect(add_query_arg('key', $expected_hash));
+                exit;
+            } else {
+                $error = __('Email address does not match our records.', 'dream-online-ticket-selling');
+            }
+        }
+        
+        if (!$has_access) {
+            $error = isset($error) ? $error : '';
+            include DOTS_PLUGIN_DIR . 'frontend/views/verify-access.php';
             exit;
         }
     }
@@ -194,7 +267,7 @@ class DOTS_Frontend {
         
         $event_id = intval($atts['event_id']);
         if (!$event_id) {
-            return '<p style="color: red;">' . __('Event ID is required. Use: [dream_ticket_form event_id="1"]', 'dream-online-ticket-selling') . '</p>';
+            return '<p style="color: red;">' . esc_html__('Event ID is required. Use: [dream_ticket_form event_id="1"]', 'dream-online-ticket-selling') . '</p>';
         }
         
         $event = DOTS_Database::get_event($event_id);
@@ -204,7 +277,7 @@ class DOTS_Frontend {
         }
         
         if ($event->status !== 'published') {
-            return '<p style="color: orange;">' . __('This event is not published yet.', 'dream-online-ticket-selling') . '</p>';
+            return '<p style="color: orange;">' . esc_html__('This event is not published yet.', 'dream-online-ticket-selling') . '</p>';
         }
         
         // Store event data for localization

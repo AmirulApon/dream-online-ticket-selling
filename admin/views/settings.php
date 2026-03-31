@@ -99,6 +99,13 @@ $admin_email = isset($settings['admin_email']) ? $settings['admin_email'] : get_
                     <th><label for="max_tickets_per_customer"><?php esc_html_e('Max Tickets per Customer', 'dream-online-ticket-selling'); ?></label></th>
                     <td><input type="number" id="max_tickets_per_customer" name="max_tickets_per_customer" value="<?php echo esc_attr($max_tickets); ?>" min="1" class="small-text"></td>
                 </tr>
+                <tr>
+                    <th><label for="enable_qr_api"><?php esc_html_e('Enable QR Code Generation', 'dream-online-ticket-selling'); ?></label></th>
+                    <td>
+                        <input type="checkbox" id="enable_qr_api" name="enable_qr_api" value="1" <?php checked(isset($settings['enable_qr_api']) && $settings['enable_qr_api'], 1); ?>>
+                        <p class="description"><?php esc_html_e('Uses external API (api.qrserver.com). Requires user consent per WP guidelines.', 'dream-online-ticket-selling'); ?></p>
+                    </td>
+                </tr>
             </table>
         </div>
         

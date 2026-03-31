@@ -463,13 +463,14 @@ class DOTS_Ajax {
         
         // Initialize payment handler
         $payment_handler = new DOTS_Payment();
+        $order_hash = substr(md5($order_number . $customer_email . wp_salt()), 0, 10);
         $order_data = array(
             'order_number' => $order_number,
             'event_id' => $event_id,
             'event_name' => $event->name,
             'total_price' => $total_price - $discount_amount,
             'payment_method' => $payment_method,
-            'return_url' => home_url('/dream-tickets/order/' . $order_number),
+            'return_url' => add_query_arg(array('key' => $order_hash, '_wpnonce' => wp_create_nonce('verify_order_' . $order_number)), home_url('/dream-tickets/order/' . $order_number . '/')),
             'customer_name' => $customer_name,
             'customer_email' => $customer_email,
             'customer_phone' => $customer_phone,
@@ -527,7 +528,7 @@ class DOTS_Ajax {
                 // Don't update tickets available yet for bank transfer
                 wp_send_json_success(array(
                     'order_number' => $order_number,
-                    'redirect_url' => home_url('/dream-tickets/order/' . $order_number),
+                    'redirect_url' => add_query_arg('key', substr(md5($order_number . $customer_email . wp_salt()), 0, 10), home_url('/dream-tickets/order/' . $order_number . '/')),
                     'message' => __('Order created. Payment pending bank transfer.', 'dream-online-ticket-selling')
                 ));
             } else {
@@ -733,12 +734,11 @@ class DOTS_Ajax {
      * Generate QR code
      */
     private function generate_qr_code($order_number, $event_name = '', $customer_name = '') {
-        // Encode just the order number — most scanners reject multiline plain text
-        $qr_url = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=2&data=' . rawurlencode($order_number);
-        
-        // Store both the QR image URL and the ticket URL for reference
-        // The QR code image URL is what we'll display
-        return $qr_url;
+        $settings = get_option('dots_settings', array());
+        if (isset($settings['enable_qr_api']) && $settings['enable_qr_api']) {
+            return 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=2&data=' . rawurlencode($order_number);
+        }
+        return '';
     }
     
     /**
